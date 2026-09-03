@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Karaoke Studio Pro — Local GPU Engine</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&family=Montserrat:wght@400;500;600;700;800;900&family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Roboto:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css?v=22.0">
+</head>
+<body>
+    <div class="app-background">
+        <div class="glow-orb orb-1"></div>
+        <div class="glow-orb orb-2"></div>
+        <div class="glow-orb orb-3"></div>
+    </div>
+
+    <div class="app-container">
+        <!-- Top Navbar -->
+        <header class="studio-header">
+            <div class="brand-group">
+                <div class="brand-text">
+                    <span class="brand-title">KARAOKE STUDIO <span class="badge-pro">PRO AI</span></span>
+                    <span class="brand-sub">Local Engine • GPU Acceleration</span>
+                </div>
+            </div>
+
+            <!-- Hardware Status Widget -->
+            <div class="system-status-pill" id="sysInfoPill">
+                <span class="status-dot online"></span>
+                <span class="status-text" id="gpuStatusText">Đang kiểm tra hệ thống...</span>
+            </div>
+
+            <!-- Nav Tabs -->
+            <nav class="nav-tabs">
+                <button class="nav-tab active" data-tab="createTab">Tạo Bài Mới</button>
+                <button class="nav-tab" data-tab="playerTab" id="navPlayerTab">Phòng Thu Karaoke</button>
+                <button class="nav-tab" data-tab="editorTab" id="navEditorTab">Chỉnh Sửa Lời & Nhịp</button>
+                <button class="nav-tab" data-tab="exportTab" id="navExportTab">Xuất Video MP4</button>
+                <button class="nav-tab" data-tab="libraryTab" id="navLibraryTab">Thư Viện</button>
+            </nav>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            
+            <!-- TAB 1: CREATE NEW KARAOKE -->
+            <section class="tab-pane active" id="createTab">
+                <div class="hero-header">
+                    <h1 class="hero-title">Tạo Video Karaoke AI Cực Nhanh</h1>
+                    <p class="hero-desc">Tách Beat sạch bằng Meta Demucs v4 và Canh nhịp từng từ bằng Whisper AI chạy trực tiếp trên GPU máy tính.</p>
+                </div>
+
+                <div class="create-grid">
+                    <!-- Left: Upload Box -->
+                    <div class="card glass-card upload-card">
+                        <div class="card-header">
+                            <h2 class="card-title">1. Chọn Nguồn Nhạc</h2>
+                            <span class="badge-free">Không giới hạn</span>
+                        </div>
+
+                        <!-- Upload Mode Switcher -->
+                        <div class="mode-switch">
+                            <button class="mode-btn active" id="modeFileBtn">Tải File Lên (MP3/WAV/MP4)</button>
+                            <button class="mode-btn" id="modeUrlBtn">Dán Link (YouTube / URL)</button>
+                        </div>
+
+                        <!-- File Drop Zone -->
+                        <div class="drop-zone" id="dropZone">
+                            <input type="file" id="audioFileInput" accept="audio/*,video/*" hidden>
+                            <h3 class="drop-title">Kéo và thả bài hát vào đây</h3>
+                            <p class="drop-sub">hoặc <span class="highlight-link">chọn file từ máy tính</span></p>
+                            <span class="drop-hint">Hỗ trợ MP3, WAV, FLAC, M4A, AAC, MP4...</span>
+                            <div class="selected-file-pill" id="selectedFilePill" style="display: none;">
+                                <span class="file-name" id="selectedFileName"></span>
+                                <button class="btn-clear" id="clearFileBtn">✕</button>
+                            </div>
+                        </div>
+
+                        <!-- URL Input Zone -->
+                        <div class="url-zone" id="urlZone" style="display: none;">
+                            <label class="input-label" for="urlInput">Đường dẫn bài hát / video</label>
+                            <div class="url-input-wrap">
+                                <input type="url" id="urlInput" placeholder="https://www.youtube.com/watch?v=..." class="text-input">
+                                <button class="btn-icon-clear" id="clearUrlBtn">✕</button>
+                            </div>
+                            <span class="input-hint">Hệ thống sẽ tự động trích xuất âm thanh chất lượng cao nhất (320kbps).</span>
+                        </div>
+                    </div>
+
+                    <!-- Right: AI Configuration -->
+                    <div class="card glass-card config-card">
+                        <div class="card-header">
+                            <h2 class="card-title">2. Cấu Hình Xử Lý AI</h2>
+                        </div>
+
+                        <!-- Hardware Accelerator Mode Selection -->
+                        <div class="form-group">
+                            <label class="input-label">Thiết Bị Xử Lý AI (Hardware Mode)</label>
+                            <div class="hardware-mode-grid">
+                                <button type="button" class="hw-mode-btn active" id="hwGpuBtn" data-mode="gpu">
+                                    <div class="hw-info">
+                                        <span class="hw-title">Chế Độ GPU (NVIDIA CUDA)</span>
+                                        <span class="hw-sub">Siêu tốc ~30s • Tận dụng RTX 3060 (Khuyên dùng)</span>
+                                    </div>
+                                </button>
+                                <button type="button" class="hw-mode-btn" id="hwCpuBtn" data-mode="cpu">
+                                    <div class="hw-info">
+                                        <span class="hw-title">Chế Độ CPU (Đa Luồng AVX)</span>
+                                        <span class="hw-sub">Tương thích 100% mọi máy • Nhường GPU cho tác vụ khác</span>
+                                    </div>
+                                </button>
+                            </div>
+                            <input type="hidden" id="hardwareModeInput" value="gpu">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="input-label" for="langSelect">Ngôn ngữ bài hát</label>
+                            <select id="langSelect" class="select-input">
+                                <option value="auto" selected>Tự động nhận diện (Auto Detect)</option>
+                                <option value="vi">Tiếng Việt (Vietnamese)</option>
+                                <option value="en">Tiếng Anh (English)</option>
+                                <option value="zh">Tiếng Trung (Chinese)</option>
+                                <option value="ja">Tiếng Nhật (Japanese)</option>
+                                <option value="ko">Tiếng Hàn (Korean)</option>
+                                <option value="fr">Tiếng Pháp (French)</option>
+                                <option value="es">Tiếng Tây Ban Nha (Spanish)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="input-label" for="whisperModelSelect">Mô hình AI Canh Nhịp Lời (Whisper)</label>
+                            <select id="whisperModelSelect" class="select-input">
+                                <option value="large-v3" selected>Large-v3 (Chính xác nhất từng từ, khuyên dùng)</option>
+                                <option value="medium">Medium (Cân bằng tốc độ và độ chính xác)</option>
+                                <option value="small">Small (Tốc độ siêu nhanh)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="input-label" for="demucsModelSelect">Mô hình Tách Beat (Meta Demucs)</label>
+                            <select id="demucsModelSelect" class="select-input">
+                                <option value="htdemucs" selected>HTDemucs v4 (Beat sạch, chi tiết vocal cao)</option>
+                                <option value="htdemucs_ft">HTDemucs Fine-Tuned (Chất lượng tách phòng thu cao cấp)</option>
+                                <option value="mdx_extra">MDX-Extra (Tách vocal rất mạnh)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="input-label" for="customLyricsInput">Lời bài hát chuẩn / SRT (Tùy chọn - Giúp lời chuẩn xác 100%)</label>
+                            <textarea id="customLyricsInput" class="text-input" rows="3" placeholder="Dán lời bài hát chuẩn hoặc nội dung file SRT/LRC vào đây (Nếu để trống, hệ thống sẽ tự động tra cứu online hoặc dùng AI nghe)..."></textarea>
+                        </div>
+
+                        <div class="form-group-checkbox">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="useCacheCheckbox" checked>
+                                <span class="checkbox-custom"></span>
+                                <span class="checkbox-text">Bật Cache siêu tốc (Nếu bài hát đã từng tách trước đó, nạp tức thì trong 0.1s)</span>
+                            </label>
+                        </div>
+
+                        <div class="process-action-wrap">
+                            <button class="btn-primary btn-glow" id="startProcessBtn">
+                                <span>BẮT ĐẦU TÁCH BEAT & BẮT NHỊP LỜI</span>
+                            </button>
+                            <span class="btn-subtext">Xử lý bằng GPU NVIDIA cục bộ trong ~30-60 giây</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 2: LIVE KARAOKE STUDIO & PLAYER -->
+            <section class="tab-pane" id="playerTab">
+                <div class="studio-workspace">
+                    <!-- Karaoke Stage (Visual Screen) -->
+                    <div class="stage-container">
+                        <div class="stage-screen" id="stageScreen">
+                            <video id="stageVideoBg" class="stage-video-bg" loop muted playsinline style="display: none;"></video>
+                            <canvas id="visualizerCanvas" class="visualizer-canvas"></canvas>
+                            <div class="stage-safe-box" id="stageSafeBox" title="Khung vùng an toàn hiển thị (Safe Title Zone)"></div>
+                            
+                            <!-- Lead-in Count-down Dots (● ● ● ●) for long intros & breaks -->
+                            <div class="stage-countdown-wrap" id="stageCountdownWrap" style="display: none;">
+                                <div class="countdown-label">VÀO NHỊP</div>
+                                <div class="countdown-dots" id="stageCountdownDots">
+                                    <span class="c-dot dot-1"></span>
+                                    <span class="c-dot dot-2"></span>
+                                    <span class="c-dot dot-3"></span>
+                                    <span class="c-dot dot-4"></span>
+                                </div>
+                            </div>
+                            
+                            <!-- Independent 2-Line Alternating Karaoke Subtitles (Separately Draggable & Resizable) -->
+                            <div class="draggable-karaoke-line line-1" id="kLine1" data-line="1" title="Nhấn giữ để di chuyển, lăn chuột hoặc kéo góc để đổi cỡ chữ. Nhấn đúp để sửa lời trực tiếp!">
+                                <div class="line-hud-badge" id="kLine1Hud">
+                                    <span class="hud-title">Dòng 1</span>
+                                    <span class="hud-sep">•</span>
+                                    <span class="hud-stat highlight-size" id="kLine1HudSize">52px</span>
+                                    <span class="hud-sep">•</span>
+                                    <span class="hud-stat" id="kLine1HudPos">X: 8% Y: 60%</span>
+                                    <div class="hud-quick-zoom">
+                                        <button type="button" class="hud-btn-zoom" data-action="zoom-out" data-line="1" title="Thu nhỏ chữ">-</button>
+                                        <button type="button" class="hud-btn-zoom" data-action="zoom-in" data-line="1" title="Phóng to chữ">+</button>
+                                    </div>
+                                    <button type="button" class="hud-btn-edit" data-action="edit-text" data-line="1" title="Sửa nhanh nội dung chữ dòng này">Sửa chữ</button>
+                                </div>
+                                <div class="line-content" id="kLine1Content">
+                                    <span class="line-placeholder">AI Karaoke Studio</span>
+                                </div>
+                                <div class="line-resize-handle" data-line="1" title="Kéo góc này để phóng to / thu nhỏ cỡ chữ"></div>
+                            </div>
+                            <div class="draggable-karaoke-line line-2" id="kLine2" data-line="2" title="Nhấn giữ để di chuyển, lăn chuột hoặc kéo góc để đổi cỡ chữ. Nhấn đúp để sửa lời trực tiếp!">
+                                <div class="line-hud-badge" id="kLine2Hud">
+                                    <span class="hud-title">Dòng 2</span>
+                                    <span class="hud-sep">•</span>
+                                    <span class="hud-stat highlight-size" id="kLine2HudSize">52px</span>
+                                    <span class="hud-sep">•</span>
+                                    <span class="hud-stat" id="kLine2HudPos">X: 42% Y: 76%</span>
+                                    <div class="hud-quick-zoom">
+                                        <button type="button" class="hud-btn-zoom" data-action="zoom-out" data-line="2" title="Thu nhỏ chữ">-</button>
+                                        <button type="button" class="hud-btn-zoom" data-action="zoom-in" data-line="2" title="Phóng to chữ">+</button>
+                                    </div>
+                                    <button type="button" class="hud-btn-edit" data-action="edit-text" data-line="2" title="Sửa nhanh nội dung chữ dòng này">Sửa chữ</button>
+                                </div>
+                                <div class="line-content" id="kLine2Content">
+                                    <span class="line-placeholder">Nhấn Phát để bắt đầu bài hát</span>
+                                </div>
+                                <div class="line-resize-handle" data-line="2" title="Kéo góc này để phóng to / thu nhỏ cỡ chữ"></div>
+                            </div>
+                        </div>
+
+                        <!-- Player Controls Bar (Streamlined Pro Studio Layout) -->
+                        <div class="player-controls-bar" id="playerControlsBar">
+                            <!-- Progress Slider -->
+                            <div class="timeline-row">
+                                <span class="time-label" id="currentTimeLabel">00:00</span>
+                                <input type="range" id="trackSeekBar" class="seek-bar" min="0" max="100" value="0" step="0.1">
+                                <span class="time-label" id="durationLabel">00:00</span>
+                            </div>
+
+                            <!-- 1. Master Studio Control Strip (Single Slimline Bar) -->
+                            <div class="master-control-strip" id="masterControlStrip">
+                                <!-- Transport Controls -->
+                                <div class="strip-section strip-transport">
+                                    <button class="ctrl-btn btn-sm" id="btnRewind10" title="Lùi 10s">« 10s</button>
+                                    <button class="ctrl-btn btn-play-main" id="btnPlayPause" title="Phát / Tạm dừng">
+                                        <span id="playIconText">Phát</span>
+                                    </button>
+                                    <button class="ctrl-btn btn-sm" id="btnForward10" title="Tiến 10s">10s »</button>
+                                </div>
+
+                                <!-- Compact Dual-Track Mixer -->
+                                <div class="strip-section strip-mixer">
+                                    <div class="mini-fader-item" title="Âm lượng Beat">
+                                        <span class="mini-fader-label">🎵 Beat</span>
+                                        <input type="range" id="beatVolSlider" class="deck-slider mini-slider" min="0" max="1" step="0.05" value="1">
+                                        <span class="mini-fader-val" id="beatVolText">100%</span>
+                                    </div>
+                                    <div class="mini-fader-item" title="Giọng Ca Sĩ Hướng Dẫn">
+                                        <span class="mini-fader-label">🎤 Ca Sĩ</span>
+                                        <input type="range" id="vocalVolSlider" class="deck-slider mini-slider" min="0" max="1" step="0.05" value="0">
+                                        <span class="mini-fader-val" id="vocalVolText">0%</span>
+                                    </div>
+                                    <!-- Tone Box -->
+                                    <div class="mini-pitch-item" title="Tăng/Giảm Tone nhạc">
+                                        <span class="mini-fader-label">🎹 Tone</span>
+                                        <div class="mini-pitch-controls">
+                                            <button class="btn-micro-step" id="btnPitchDown" title="Hạ 1 nửa cung">-1</button>
+                                            <span class="pitch-val-badge mini-badge" id="pitchValText">0</span>
+                                            <button class="btn-micro-step" id="btnPitchUp" title="Tăng 1 nửa cung">+1</button>
+                                            <button class="btn-sync-reset mini-reset" id="btnPitchReset" title="Về tone gốc">↺</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Compact Master Timing Sync Pill -->
+                                <div class="strip-section strip-sync" id="timingSyncMasterCard">
+                                    <div class="sync-pill-wrap">
+                                        <span class="sync-dot-live"></span>
+                                        <span class="sync-pill-title">Nhịp:</span>
+                                        <button class="btn-micro-step" id="btnOffsetMinus50" title="Chữ sớm hơn 50ms">-50ms</button>
+                                        <span class="sync-val-display mini-sync-val" id="offsetValText">0 ms</span>
+                                        <button class="btn-micro-step" id="btnOffsetPlus50" title="Chữ trễ hơn 50ms">+50ms</button>
+                                        <button class="btn-sync-reset mini-reset" id="btnOffsetReset" title="Đặt lại 0s">0s</button>
+                                        <button class="btn-save-sync-glow mini-save-btn" id="btnSaveOffset" title="Lưu mốc nhịp đã căn chỉnh">Lưu</button>
+                                        <button class="btn-icon-toggle" id="btnToggleFineSync" title="Mở thanh trượt tinh chỉnh sâu">▼</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Collapsible Fine Timing Slider Drawer -->
+                            <div class="fine-sync-drawer" id="fineSyncDrawer" style="display: none;">
+                                <div class="fine-sync-inner">
+                                    <div class="sync-btn-group">
+                                        <button class="btn-micro-step" id="btnOffsetMinus200">-200ms</button>
+                                        <button class="btn-micro-step" id="btnOffsetMinus10">-10ms</button>
+                                    </div>
+                                    <div class="sync-slider-wrapper">
+                                        <input type="range" id="offsetRangeSlider" class="sync-range-slider" min="-2000" max="2000" step="10" value="0">
+                                        <div class="sync-ticks">
+                                            <span>-2.0s</span>
+                                            <span>-1.0s</span>
+                                            <span class="sync-center-tick">0s</span>
+                                            <span>+1.0s</span>
+                                            <span>+2.0s</span>
+                                        </div>
+                                    </div>
+                                    <div class="sync-btn-group">
+                                        <button class="btn-micro-step" id="btnOffsetPlus10">+10ms</button>
+                                        <button class="btn-micro-step" id="btnOffsetPlus200">+200ms</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 2. Studio Action Dock (Presets, Navigation & Cinema Mode) -->
+                            <div class="studio-action-dock">
+                                <div class="dock-group-left">
+                                    <span class="dock-label-hint">Bố Cục:</span>
+                                    <div class="segmented-pill-group">
+                                        <button type="button" class="btn-dock-pill active" id="btnPresetCenter" title="Căn giữa 2 dòng cân đối tuyệt đối (Hình 2)">
+                                            🎯 Căn Giữa
+                                        </button>
+                                        <button type="button" class="btn-dock-pill" id="btnPresetStaggered" title="Dòng 1 Trái, Dòng 2 Phải chuẩn cổ điển">
+                                            📐 So Le
+                                        </button>
+                                        <button type="button" class="btn-dock-pill" id="btnPresetAutoFit" title="Tự động tính cỡ chữ tối ưu cho toàn bài">
+                                            ✨ Cỡ Tối Ưu
+                                        </button>
+                                    </div>
+                                    <label class="autofit-switch-label mini-autofit" title="Tự động thu nhỏ nhẹ những câu dài để không bị tràn viền">
+                                        <input type="checkbox" id="chkAutoFit" checked>
+                                        <span class="autofit-switch-slider"></span>
+                                        <span class="autofit-label-text">Auto-Fit</span>
+                                    </label>
+                                </div>
+
+                                <div class="dock-group-right">
+                                    <button class="dock-btn-compact" id="btnToggleLyricJump" title="Mở danh sách canh nhịp từng câu">
+                                        <span>📋 Canh Từng Câu</span>
+                                    </button>
+                                    <button class="dock-btn-compact active" id="btnToggleVisualCustomizer" title="Mở cấu hình sân khấu & chữ">
+                                        <span>🎨 Tùy Chỉnh Sân Khấu</span>
+                                    </button>
+                                    <button class="dock-btn-compact" id="btnGoToEditor" title="Chuyển sang bảng sửa lời">
+                                        <span>✏️ Sửa Lời</span>
+                                    </button>
+                                    <button class="dock-btn-compact dock-btn-glow" id="btnGoToExport" title="Chuyển sang xuất video MP4">
+                                        <span>🎬 Xuất Video MP4</span>
+                                    </button>
+                                    <button class="dock-btn-compact btn-cinema-mode" id="btnToggleCinema" title="Bật/Tắt chế độ rạp chiếu (Toàn màn hình sạch)">
+                                        <span>🔲 Rạp Chiếu</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Drawer A: Quick Jump & Per-Segment Calibrator -->
+                            <div class="lyric-jump-drawer" id="lyricJumpDrawer" style="display: none;">
+                                <div class="drawer-header">
+                                    <div class="drawer-title-wrap">
+                                        <span class="sync-dot-live"></span>
+                                        <span class="drawer-title">Căn Chỉnh Nhịp Từng Câu</span>
+                                        <span class="drawer-subtitle-hint">Bấm nghe thử, lặp lại, hoặc nhích ±10ms/50ms cho riêng từng câu</span>
+                                    </div>
+                                    <div class="drawer-header-actions">
+                                        <button class="btn-save-sync-glow" onclick="handleSaveLyrics()" style="padding: 5px 14px; font-size: 0.78rem;">Lưu Mốc Nhịp</button>
+                                    </div>
+                                </div>
+                                <div class="lyric-jump-list" id="lyricJumpList">
+                                    <!-- Populated dynamically by JS -->
+                                </div>
+                            </div>
+
+                            <!-- Drawer B: Streamlined Tabbed Stage Customizer -->
+                            <div class="stage-customizer-drawer" id="stageCustomizerDrawer" style="display: block;">
+                                <!-- Inspector Tab Headers -->
+                                <div class="inspector-tabs-header">
+                                    <div class="inspector-tab-btns">
+                                        <button type="button" class="btn-inspector-tab active" id="tabBtnStyle" data-tab="paneStyle">
+                                            🎨 Phông Chữ & Hình Nền
+                                        </button>
+                                        <button type="button" class="btn-inspector-tab" id="tabBtnPosition" data-tab="panePosition">
+                                            📐 Vị Trí & Ma Trận 9 Điểm
+                                        </button>
+                                    </div>
+                                    <div class="inspector-header-right">
+                                        <button type="button" class="btn-primary btn-sm btn-glow" id="btnSaveProjectSettings">Lưu Cấu Hình</button>
+                                        <button type="button" class="btn-secondary btn-sm" id="btnResetProjectSettings">Đặt Lại</button>
+                                    </div>
+                                </div>
+
+                                <!-- Tab 1: Visual Style & Backgrounds -->
+                                <div class="inspector-tab-pane active" id="paneStyle">
+                                    <div class="inspector-style-grid">
+                                        <div class="insp-col">
+                                            <label class="mod-label">Phông Chữ (Font):</label>
+                                            <select id="stageFontSelect" class="select-input select-sm">
+                                                <option value="'Outfit', sans-serif" selected>Outfit (Hiện đại, tròn trịa)</option>
+                                                <option value="'Montserrat', sans-serif">Montserrat (Đậm nét YouTube)</option>
+                                                <option value="'Be Vietnam Pro', sans-serif">Be Vietnam Pro (Chuẩn Việt Nam)</option>
+                                                <option value="'Plus Jakarta Sans', sans-serif">Plus Jakarta Sans (Gọn gàng)</option>
+                                                <option value="Arial, sans-serif">Arial (Tiêu chuẩn)</option>
+                                                <option value="'Roboto', sans-serif">Roboto (Cổ điển)</option>
+                                                <option value="'Segoe UI', sans-serif">Segoe UI (Mềm mại)</option>
+                                            </select>
+                                        </div>
+                                        <div class="insp-col">
+                                            <label class="mod-label">Hình Nền Sân Khấu:</label>
+                                            <div class="bg-preset-chips">
+                                                <button class="bg-chip active" data-bg="nebula" title="Nebula Dark Studio">Nebula</button>
+                                                <button class="bg-chip" data-bg="cyber" title="Cyber Neon Wave">Cyber Wave</button>
+                                                <button class="bg-chip" data-bg="gold" title="Golden Bokeh">Golden Bokeh</button>
+                                                <button class="bg-chip" data-bg="black" title="OLED Pure Black">Pure Black</button>
+                                                <button class="bg-chip" data-bg="sunset" title="Sunset Lo-Fi">Sunset</button>
+                                                <button class="bg-chip" data-bg="sakura" title="Cherry Blossom">Sakura</button>
+                                            </div>
+                                        </div>
+                                        <div class="insp-col">
+                                            <label class="mod-label">Tải Nền Riêng (Ảnh/Video):</label>
+                                            <input type="file" id="stageBgFileInput" accept="image/*,video/*" hidden>
+                                            <button class="btn-secondary btn-sm btn-full" id="btnUploadStageBg">Chọn File Từ Máy</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Tab 2: 2D Position Grid Matrix (9-Point Grid) -->
+                                <div class="inspector-tab-pane" id="panePosition" style="display: none;">
+                                    <div class="grid-inspector-container">
+                                        <!-- Line 1 9-Point Matrix Card -->
+                                        <div class="grid-line-card">
+                                            <div class="grid-card-head">
+                                                <span class="grid-tag highlight-cyan">Khối Dòng Trên (Line 1)</span>
+                                                <span class="grid-hud-hint" id="kLine1HudPos">Giữa (50%) • Y: 60%</span>
+                                            </div>
+                                            <div class="grid-card-body">
+                                                <div class="grid-size-row">
+                                                    <span class="grid-label">Cỡ chữ:</span>
+                                                    <button type="button" class="btn-micro-step" id="btnZoomOut1">-</button>
+                                                    <span class="grid-val-bubble" id="stageFontSize1Text">52px</span>
+                                                    <button type="button" class="btn-micro-step" id="btnZoomIn1">+</button>
+                                                    <input type="range" id="stageFontSize1Slider" min="24" max="88" value="52" class="deck-slider inline-slider">
+                                                </div>
+
+                                                <div class="matrix-9-wrap">
+                                                    <span class="matrix-title">Ma trận 9 Điểm (Bấm 1 chạm chuyển góc):</span>
+                                                    <div class="matrix-9-grid" id="matrixGridLine1">
+                                                        <button type="button" class="matrix-cell" data-line="1" data-x="0.08" data-y="0.25" title="Trái Trên">↖</button>
+                                                        <button type="button" class="matrix-cell" data-line="1" data-x="0.50" data-y="0.25" title="Giữa Trên">↑</button>
+                                                        <button type="button" class="matrix-cell" data-line="1" data-x="0.58" data-y="0.25" title="Phải Trên">↗</button>
+                                                        <button type="button" class="matrix-cell" data-line="1" data-x="0.08" data-y="0.45" title="Trái Giữa">←</button>
+                                                        <button type="button" class="matrix-cell" data-line="1" data-x="0.50" data-y="0.45" title="Trung Tâm">🎯</button>
+                                                        <button type="button" class="matrix-cell" data-line="1" data-x="0.58" data-y="0.45" title="Phải Giữa">→</button>
+                                                        <button type="button" class="matrix-cell" data-line="1" data-x="0.08" data-y="0.60" title="Trái Dưới">↙</button>
+                                                        <button type="button" class="matrix-cell active" data-line="1" data-x="0.50" data-y="0.60" title="Giữa Dưới (Mặc định)">↓</button>
+                                                        <button type="button" class="matrix-cell" data-line="1" data-x="0.58" data-y="0.60" title="Phải Dưới">↘</button>
+                                                    </div>
+                                                </div>
+                                                <input type="hidden" id="stagePosX1Slider" value="50">
+                                                <input type="hidden" id="stagePosY1Slider" value="60">
+                                                <span id="stagePosX1Text" style="display:none;">50%</span>
+                                                <span id="stagePosY1Text" style="display:none;">60%</span>
+                                            </div>
+                                        </div>
+
+                                        <!-- Line 2 9-Point Matrix Card -->
+                                        <div class="grid-line-card">
+                                            <div class="grid-card-head">
+                                                <span class="grid-tag highlight-cyan">Khối Dòng Dưới (Line 2)</span>
+                                                <span class="grid-hud-hint" id="kLine2HudPos">Giữa (50%) • Y: 76%</span>
+                                            </div>
+                                            <div class="grid-card-body">
+                                                <div class="grid-size-row">
+                                                    <span class="grid-label">Cỡ chữ:</span>
+                                                    <button type="button" class="btn-micro-step" id="btnZoomOut2">-</button>
+                                                    <span class="grid-val-bubble" id="stageFontSize2Text">52px</span>
+                                                    <button type="button" class="btn-micro-step" id="btnZoomIn2">+</button>
+                                                    <input type="range" id="stageFontSize2Slider" min="24" max="88" value="52" class="deck-slider inline-slider">
+                                                </div>
+
+                                                <div class="matrix-9-wrap">
+                                                    <span class="matrix-title">Ma trận 9 Điểm (Bấm 1 chạm chuyển góc):</span>
+                                                    <div class="matrix-9-grid" id="matrixGridLine2">
+                                                        <button type="button" class="matrix-cell" data-line="2" data-x="0.08" data-y="0.35" title="Trái Trên">↖</button>
+                                                        <button type="button" class="matrix-cell" data-line="2" data-x="0.50" data-y="0.35" title="Giữa Trên">↑</button>
+                                                        <button type="button" class="matrix-cell" data-line="2" data-x="0.42" data-y="0.35" title="Phải Trên">↗</button>
+                                                        <button type="button" class="matrix-cell" data-line="2" data-x="0.08" data-y="0.55" title="Trái Giữa">←</button>
+                                                        <button type="button" class="matrix-cell" data-line="2" data-x="0.50" data-y="0.55" title="Trung Tâm">🎯</button>
+                                                        <button type="button" class="matrix-cell" data-line="2" data-x="0.42" data-y="0.55" title="Phải Giữa">→</button>
+                                                        <button type="button" class="matrix-cell" data-line="2" data-x="0.08" data-y="0.76" title="Trái Dưới">↙</button>
+                                                        <button type="button" class="matrix-cell active" data-line="2" data-x="0.50" data-y="0.76" title="Giữa Dưới (Mặc định)">↓</button>
+                                                        <button type="button" class="matrix-cell" data-line="2" data-x="0.42" data-y="0.76" title="Phải Dưới">↘</button>
+                                                    </div>
+                                                </div>
+                                                <input type="hidden" id="stagePosX2Slider" value="50">
+                                                <input type="hidden" id="stagePosY2Slider" value="76">
+                                                <span id="stagePosX2Text" style="display:none;">50%</span>
+                                                <span id="stagePosY2Text" style="display:none;">76%</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="grid-footer-hint">
+                                        💡 <span>Bạn cũng có thể kéo thả 2D tự do hoặc kéo góc badge trực tiếp trên màn hình sân khấu.</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 3: LYRICS & TIMING EDITOR -->
+            <section class="tab-pane" id="editorTab">
+                <div class="editor-header">
+                    <div>
+                        <h2 class="section-title">Chỉnh Sửa Lời & Timestamp Từng Từ</h2>
+                        <p class="section-desc">Bạn có thể sửa lại từ ngữ, bấm vào từng từ để nghe lại đoạn âm thanh tương ứng, hoặc chỉnh lại nhịp bắt đầu/kết thúc.</p>
+                    </div>
+                    <div class="editor-actions">
+                        <input type="file" id="importSubFileInput" accept=".srt,.lrc" hidden>
+                        <button class="btn-secondary btn-tap-sync" id="btnStartTapSync" title="Gõ phím Space theo nhịp để tự động canh lời theo tai nghe">⌨️ Gõ Nhịp Trực Tiếp (Tap-to-Sync)</button>
+                        <button class="btn-secondary" id="btnImportSubFile">Nạp file SRT / LRC</button>
+                        <button class="btn-secondary" id="btnAutoSplitLongLines" title="Tự động tách các câu dài trên 8 từ thành 2 dòng luân phiên">Tự Động Chia Câu Dài (2 Dòng)</button>
+                        <button class="btn-secondary" id="btnReloadAI">Nạp Lại Bản Gốc</button>
+                        <button class="btn-primary btn-glow" id="btnSaveLyrics">Lưu Thay Đổi & Cập Nhật Sub</button>
+                    </div>
+                </div>
+
+                <!-- Live Tap-to-Sync Master Console -->
+                <div class="tap-sync-master-card" id="tapSyncMasterCard" style="display: none;">
+                    <div class="tap-sync-header">
+                        <div class="tap-sync-title">
+                            <span class="sync-dot-live"></span>
+                            <span>Chế Độ Gõ Nhịp Bàn Phím Trực Tiếp (Live Tap-to-Sync)</span>
+                        </div>
+                        <div class="tap-sync-actions">
+                            <button class="btn-primary" id="btnFinishTapSync">Hoàn Tất & Lưu Nhịp</button>
+                            <button class="btn-secondary" id="btnCancelTapSync">Thoát Chế Độ</button>
+                        </div>
+                    </div>
+                    <div class="tap-sync-body">
+                        <div class="tap-sync-hint">👉 Hãy bấm phím <strong>[Space]</strong> (hoặc bấm nút to bên dưới) mỗi khi ca sĩ hát đến từ tiếp theo:</div>
+                        <div class="tap-sync-display">
+                            <div class="tap-current-sentence" id="tapCurrentSentence">Đang chuẩn bị...</div>
+                            <div class="tap-word-highlight" id="tapWordHighlight">Chờ bắt đầu...</div>
+                        </div>
+                        <div class="tap-action-big-wrap">
+                            <button type="button" class="btn-tap-space-big" id="btnTapSpaceBig">
+                                <span class="tap-icon">👇</span>
+                                <span class="tap-main-text">GÕ NHỊP TỪ NÀY [SPACE]</span>
+                                <span class="tap-sub-text">Bấm phím Space hoặc Click chuột</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card glass-card lyrics-table-card">
+                    <div class="table-responsive">
+                        <table class="lyrics-table">
+                            <thead>
+                                <tr>
+                                    <th width="50">STT</th>
+                                    <th width="100">Bắt đầu</th>
+                                    <th width="100">Kết thúc</th>
+                                    <th width="110">Vai Hát</th>
+                                    <th>Nội Dung Câu & Từng Từ (Click từ để nghe)</th>
+                                    <th width="110">Hành Động</th>
+                                </tr>
+                            </thead>
+                            <tbody id="lyricsTableBody">
+                                <!-- Populated dynamically by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 4: EXPORT VIDEO MP4 -->
+            <section class="tab-pane" id="exportTab">
+                <div class="export-grid">
+                    <!-- Left: Customizer -->
+                    <div class="card glass-card export-config-card">
+                        <h2 class="card-title">Tùy Biến Giao Diện Video Karaoke</h2>
+
+                        <div class="form-group">
+                            <label class="input-label" for="exportFontSelect">Phông Chữ Video</label>
+                            <select id="exportFontSelect" class="select-input">
+                                <option value="Outfit" selected>Outfit (Hiện đại, tròn trịa)</option>
+                                <option value="Montserrat">Montserrat (Đậm nét chuẩn YouTube)</option>
+                                <option value="Be Vietnam Pro">Be Vietnam Pro (Chuẩn tiếng Việt)</option>
+                                <option value="Plus Jakarta Sans">Plus Jakarta Sans (Gọn gàng)</option>
+                                <option value="Arial">Arial (Mặc định)</option>
+                                <option value="Roboto">Roboto (Cổ điển)</option>
+                                <option value="Segoe UI">Segoe UI (Mềm mại)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="input-label">Theme Màu Phong Cách</label>
+                            <div class="preset-theme-grid">
+                                <button class="theme-btn active" data-theme="gold">
+                                    <span class="theme-color-preview" style="background: linear-gradient(135deg, #FFE259, #FFA751);"></span>
+                                    <span>Vàng Gold Sang Trọng</span>
+                                </button>
+                                <button class="theme-btn" data-theme="cyan">
+                                    <span class="theme-color-preview" style="background: linear-gradient(135deg, #00F2FE, #4FACFE);"></span>
+                                    <span>Xanh Cyan Cyberpunk</span>
+                                </button>
+                                <button class="theme-btn" data-theme="pink">
+                                    <span class="theme-color-preview" style="background: linear-gradient(135deg, #FF758C, #FF7EB3);"></span>
+                                    <span>Hồng Neon Hiện Đại</span>
+                                </button>
+                                <button class="theme-btn" data-theme="white">
+                                    <span class="theme-color-preview" style="background: linear-gradient(135deg, #E0EAFC, #CFDEF3);"></span>
+                                    <span>Trắng Minimalist</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="color-picker-row">
+                            <div class="form-group">
+                                <label class="input-label" for="colorInactive">Màu chữ chờ hát</label>
+                                <input type="color" id="colorInactive" value="#ffffff" class="color-picker-input">
+                            </div>
+                            <div class="form-group">
+                                <label class="input-label" for="colorActive">Màu chữ khi hát qua</label>
+                                <input type="color" id="colorActive" value="#FFE259" class="color-picker-input">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="input-label">Vị Trí Chữ Trong Video</label>
+                            <div class="pos-preset-chips">
+                                <button type="button" class="btn-micro-step export-pos-btn" data-pos="0.20">Trên Cùng</button>
+                                <button type="button" class="btn-micro-step export-pos-btn" data-pos="0.50">Giữa Màn Hình</button>
+                                <button type="button" class="btn-micro-step export-pos-btn active" data-pos="0.75">Dưới Cùng (Mặc định)</button>
+                            </div>
+                            <input type="hidden" id="exportSubtitlePosYInput" value="0.75">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="input-label" for="videoResolutionSelect">Định dạng & Độ phân giải</label>
+                            <select id="videoResolutionSelect" class="select-input">
+                                <option value="1920x1080" selected>1080p Ngang (1920x1080 - Chuẩn TV & YouTube)</option>
+                                <option value="1080x1920">1080p Dọc (1080x1920 - Chuẩn TikTok, Reels, Shorts)</option>
+                                <option value="1280x720">720p HD (1280x720 - Render nhanh)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="input-label">Hình Nền / Video Nền (Background)</label>
+                            <div class="bg-upload-wrap">
+                                <input type="file" id="bgFileInput" accept="image/*,video/*" hidden>
+                                <button class="btn-secondary" id="btnSelectBgFile">Tải Ảnh / Video Nền Tùy Chọn</button>
+                                <span class="bg-status-text" id="bgStatusText">Mặc định: Gradient Dark Studio</span>
+                            </div>
+                        </div>
+
+                        <div class="render-action-wrap">
+                            <button class="btn-primary btn-glow btn-large" id="btnStartRender">
+                                <span>XUẤT VIDEO KARAOKE MP4 (GPU NVENC)</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Right: Download Assets & Preview -->
+                    <div class="card glass-card export-result-card">
+                        <h2 class="card-title">Tải Về & File Xuất</h2>
+                        
+                        <!-- Video Player Preview once rendered -->
+                        <div class="video-preview-box" id="videoPreviewBox">
+                            <div class="empty-video-placeholder" id="emptyVideoPlaceholder">
+                                <span>Video xuất sẽ hiển thị tại đây</span>
+                            </div>
+                            <video id="renderedVideoPlayer" controls style="display: none;" class="rendered-video"></video>
+                        </div>
+
+                        <!-- Direct File Downloads -->
+                        <div class="download-links-list">
+                            <a href="#" class="download-item-btn dl-video-highlight" id="dlVideoBtn" style="display: none;" download>
+                                <div class="dl-info">
+                                    <span class="dl-title">Tải Video Karaoke MP4 (Về máy)</span>
+                                    <span class="dl-meta">1080p • H.264 • Tải về thư mục Downloads</span>
+                                </div>
+                            </a>
+                            <button class="download-item-btn" id="btnOpenLocalFolder" style="display: none; background: rgba(0, 242, 254, 0.12); border-color: var(--cyan-accent); width: 100%; text-align: left;">
+                                <div class="dl-info">
+                                    <span class="dl-title" style="color: var(--cyan-accent); font-weight: 700;">Mở Thư Mục Chứa File Trên Máy</span>
+                                    <span class="dl-meta">Mở trực tiếp thư mục lưu trữ trên Windows Explorer</span>
+                                </div>
+                            </button>
+                            <a href="#" class="download-item-btn" id="dlInstrumentalBtn" download>
+                                <div class="dl-info">
+                                    <span class="dl-title">Nhạc Beat (Instrumental MP3)</span>
+                                    <span class="dl-meta">320kbps • Đã tách vocal</span>
+                                </div>
+                            </a>
+                            <a href="#" class="download-item-btn" id="dlVocalBtn" download>
+                                <div class="dl-info">
+                                    <span class="dl-title">Giọng Ca Sĩ (Vocal MP3)</span>
+                                    <span class="dl-meta">256kbps • Giọng hát riêng biệt</span>
+                                </div>
+                            </a>
+                            <a href="#" class="download-item-btn" id="dlAssSubBtn" download>
+                                <div class="dl-info">
+                                    <span class="dl-title">Phụ Đề Karaoke (.ASS)</span>
+                                    <span class="dl-meta">Chứa hiệu ứng đổi màu chuẩn Aegisub/Premiere</span>
+                                </div>
+                            </a>
+                            <a href="#" class="download-item-btn" id="dlLrcSubBtn" download>
+                                <div class="dl-info">
+                                    <span class="dl-title">File Lời Canh Nhịp (.LRC)</span>
+                                    <span class="dl-meta">Chuẩn LRC Word-sync cho mọi ứng dụng nghe nhạc</span>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 5: RECENT PROJECTS LIBRARY -->
+            <section class="tab-pane" id="libraryTab">
+                <div class="library-header">
+                    <h2 class="section-title">Thư Viện Bài Hát Của Bạn</h2>
+                    <button class="btn-secondary" id="btnRefreshLibrary">Làm Mới</button>
+                </div>
+                <div class="projects-grid" id="projectsGrid">
+                    <!-- Populated dynamically by JS -->
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- PROCESSING OVERLAY MODAL -->
+    <div class="modal-overlay" id="processModal" style="display: none;">
+        <div class="modal-card glass-card">
+            <div class="modal-spinner">
+                <div class="spinner-ring"></div>
+            </div>
+            <h3 class="modal-title" id="modalTitle">AI Đang Xử Lý Bài Hát...</h3>
+            <p class="modal-sub" id="modalSub">Vui lòng đợi giây lát</p>
+            
+            <div class="progress-bar-wrap">
+                <div class="progress-fill" id="modalProgressFill" style="width: 5%;"></div>
+            </div>
+            <span class="progress-pct" id="modalProgressPct">5%</span>
+
+            <div class="step-status-list">
+                <div class="step-item" id="stepUpload"><span class="step-dot"></span> 1. Chuẩn bị file âm thanh</div>
+                <div class="step-item" id="stepDemucs"><span class="step-dot"></span> 2. Tách Beat & Vocal AI (Demucs v4)</div>
+                <div class="step-item" id="stepWhisper"><span class="step-dot"></span> 3. Bắt nhịp từng từ (Whisper AI)</div>
+                <div class="step-item" id="stepSub"><span class="step-dot"></span> 4. Khởi tạo phụ đề & Studio</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js?v=22.0"></script>
+</body>
+</html>
