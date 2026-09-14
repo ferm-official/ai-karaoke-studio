@@ -38,6 +38,7 @@ STORAGE_DIR = BASE_DIR / "storage"
 PROJECTS_DIR = STORAGE_DIR / "projects"
 WEB_DIR = BASE_DIR / "web"
 LOGS_DIR = BASE_DIR / "logs"
+TEST_DIR = BASE_DIR / "test"
 
 PROJECTS_DIR.mkdir(parents=True, exist_ok=True)
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
