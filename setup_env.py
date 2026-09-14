@@ -10,6 +10,7 @@ import os
 import subprocess
 from pathlib import Path
 
+# Configure UTF-8 for Windows console if possible
 if sys.platform == "win32":
     try:
         sys.stdout.reconfigure(encoding="utf-8")
@@ -108,13 +109,23 @@ def main():
     if ffmpeg_ok:
         print("[OK] FFmpeg đã có sẵn trên hệ thống.")
     else:
-        print("-----------------------------------------------------------------------")
-        print("[CHÚ Ý] Máy tính chưa có công cụ FFmpeg trong biến môi trường PATH.")
-        print("        Tool cần FFmpeg để xuất video Karaoke MP4 và tách âm thanh.")
-        print("        Cách cài nhanh trên Windows (mở PowerShell và gõ):")
-        print("            winget install Gyan.FFmpeg")
-        print("        Hoặc tải giải nén từ: https://www.gyan.dev/ffmpeg/builds/")
-        print("-----------------------------------------------------------------------")
+        print("[!] Chưa có FFmpeg trên máy. Đang thử cài đặt tự động qua winget...")
+        try:
+            w = subprocess.run(["winget", "install", "Gyan.FFmpeg", "--accept-package-agreements", "--accept-source-agreements"], timeout=180)
+            ffmpeg_ok = (w.returncode == 0)
+        except Exception:
+            ffmpeg_ok = False
+
+        if ffmpeg_ok:
+            print("[OK] Đã cài đặt FFmpeg thành công qua winget.")
+        else:
+            print("-----------------------------------------------------------------------")
+            print("[CHÚ Ý] Máy tính chưa có công cụ FFmpeg trong biến môi trường PATH.")
+            print("        Tool cần FFmpeg để xuất video Karaoke MP4 và tách âm thanh.")
+            print("        Cách cài nhanh trên Windows (mở PowerShell và gõ):")
+            print("            winget install Gyan.FFmpeg")
+            print("        Hoặc tải giải nén từ: https://www.gyan.dev/ffmpeg/builds/")
+            print("-----------------------------------------------------------------------")
 
     print()
     print("=" * 68)

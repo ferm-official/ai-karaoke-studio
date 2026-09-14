@@ -55,21 +55,20 @@ if exist "C:\Python310\python.exe" (
 
 :NOT_FOUND
 echo =======================================================================
-echo [LOI] KHONG TIM THAY PYTHON TREN MAY TINH CUA BAN!
+echo [LOI] CHUA TIM THAY PYTHON TREN MAY TINH CUA BAN!
 echo =======================================================================
 echo.
-echo De chay duoc tool, may tinh cua ban can cai dat Python.
+echo He thong dang tu dong mo trinh duyet de tai Python 3.10 (64-bit)...
+start https://www.python.org/ftp/python/3.10.11/python-3.10.11-amd64.exe
 echo.
-echo Buoc 1: Tai Python ban 3.10 hoac 3.11 tai trang chu:
-echo         https://www.python.org/downloads/
-echo.
-echo Buoc 2 (RAT QUAN TRONG):
-echo         Khi mo file cai dat Python, hay TICH CHON vao o:
-echo         [x] Add Python to PATH (hoac Add python.exe to PATH)
-echo         o ngay duoi cung man hinh dau tien.
-echo.
-echo Buoc 3: Sau khi cai dat xong Python, hay chay lai file nay!
-echo =======================================================================
+echo -----------------------------------------------------------------------
+echo LUU Y RAT QUAN TRONG KHI CAI DAT PYTHON:
+echo   1. Mo file "python-3.10.11-amd64.exe" vua tai ve trong muc Downloads.
+echo   2. O ngay man hinh dau tien, hay TICH CHON vao o:
+echo          [x] Add Python 3.10 to PATH
+echo   3. Nhap chuot vao "Install Now" de bat dau cai dat.
+echo   4. Sau khi cai dat xong, hay mo lai file [1_CAI_DAT_MOI_TRUONG.bat] nay!
+echo -----------------------------------------------------------------------
 echo.
 pause
 exit /b 1
@@ -82,7 +81,7 @@ echo.
 %PY_EXEC% setup_env.py
 if %errorlevel% neq 0 (
     echo.
-    echo [CANH BAO] Qua trinh cai dat co the gap loi. Vui long kiem tra lai mang Internet.
+    echo [CANH BAO] Qua trinh cai dat co the gap loi. Vui long kiem tra lai ket noi mang.
 )
 echo.
 pause
