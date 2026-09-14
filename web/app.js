@@ -2881,31 +2881,41 @@ function seekRelative(delta) {
    ======================================================== */
 function applyStageFont(fontFamily) {
     if (!fontFamily) return;
-    state.fontName = fontFamily;
+    let formattedFont = fontFamily.trim();
+    if (!formattedFont.includes(",") && !formattedFont.startsWith("'") && !formattedFont.startsWith('"')) {
+        formattedFont = `'${formattedFont}', 'Tahoma', sans-serif`;
+    }
+    state.fontName = formattedFont;
     state._cachedSongSafeSize = null;
     state._cachedSongSafeSizeSegsRef = null;
 
-    document.documentElement.style.setProperty("--karaoke-font", fontFamily);
+    document.documentElement.style.setProperty("--karaoke-font", formattedFont);
     const stageScreen = document.getElementById("stageScreen") || document.getElementById("karaokeScreen");
-    if (stageScreen) stageScreen.style.setProperty("--karaoke-font", fontFamily);
+    if (stageScreen) stageScreen.style.setProperty("--karaoke-font", formattedFont);
 
     const kLine1 = document.getElementById("kLine1");
     const kLine2 = document.getElementById("kLine2");
     const kLine1Content = document.getElementById("kLine1Content");
     const kLine2Content = document.getElementById("kLine2Content");
 
-    if (kLine1) kLine1.style.fontFamily = fontFamily;
-    if (kLine2) kLine2.style.fontFamily = fontFamily;
-    if (kLine1Content) kLine1Content.style.fontFamily = fontFamily;
-    if (kLine2Content) kLine2Content.style.fontFamily = fontFamily;
+    if (kLine1) kLine1.style.fontFamily = formattedFont;
+    if (kLine2) kLine2.style.fontFamily = formattedFont;
+    if (kLine1Content) kLine1Content.style.fontFamily = formattedFont;
+    if (kLine2Content) kLine2Content.style.fontFamily = formattedFont;
 
-    document.querySelectorAll(".draggable-karaoke-line, .draggable-karaoke-line .line-content, .text-layer-base, .text-layer-active, .k-word-unit, .k-word, .k-word-wrap, .k-word-base, .k-word-fill-inner, .line-placeholder").forEach(el => {
-        el.style.fontFamily = fontFamily;
+    document.querySelectorAll(".karaoke-line, .karaoke-line .line-content, .draggable-karaoke-line, .draggable-karaoke-line .line-content, .text-layer-base, .text-layer-active, .k-word-unit, .k-word, .k-word-wrap, .k-word-base, .k-word-fill-inner, .line-placeholder").forEach(el => {
+        el.style.fontFamily = formattedFont;
     });
 
     const stageFontSelect = document.getElementById("stageFontSelect");
-    if (stageFontSelect && stageFontSelect.value !== fontFamily) {
-        stageFontSelect.value = fontFamily;
+    if (stageFontSelect) {
+        const cleanVal = fontFamily.split(",")[0].replace(/['"]/g, "").trim();
+        for (let opt of stageFontSelect.options) {
+            if (opt.value === fontFamily || opt.value === cleanVal) {
+                stageFontSelect.value = opt.value;
+                break;
+            }
+        }
     }
 
     const exportFontSelect = document.getElementById("exportFontSelect") || document.getElementById("fontSelect");
@@ -3205,20 +3215,20 @@ function synchronizeLinesAutoFit(kLine1, kLine2) {
     const baseFontSize = (state.fontSizeLine1 || state.fontSizeLine2 || 52);
     let uniformFontSize = baseFontSize;
 
-    // Apply font size to BOTH lines across couplets
+    // Apply font size to BOTH lines across couplets - ALWAYS 100% IDENTICAL
     if (content1) content1.style.fontSize = `${uniformFontSize}px`;
     if (content2) content2.style.fontSize = `${uniformFontSize}px`;
 
-    // If Auto-Fit is enabled and rendered text still breaches maxSafeW,
-    // safely step-down so it doesn't overflow the screen
+    // If Auto-Fit is enabled and either line breaches maxSafeW,
+    // safely step-down BOTH lines simultaneously so they NEVER diverge in font size or stroke ratio!
     if (state.isAutoFitEnabled !== false) {
         let curW1 = content1 ? (content1.scrollWidth || 0) : 0;
         let curW2 = content2 ? (content2.scrollWidth || 0) : 0;
         let steps = 0;
-        while ((curW1 > maxSafeW || curW2 > maxSafeW) && uniformFontSize > 22 && steps < 10) {
+        while ((curW1 > maxSafeW || curW2 > maxSafeW) && uniformFontSize > 22 && steps < 16) {
             uniformFontSize -= 2;
-            if (content1 && curW1 > maxSafeW) content1.style.fontSize = `${uniformFontSize}px`;
-            if (content2 && curW2 > maxSafeW) content2.style.fontSize = `${uniformFontSize}px`;
+            if (content1) content1.style.fontSize = `${uniformFontSize}px`;
+            if (content2) content2.style.fontSize = `${uniformFontSize}px`;
             curW1 = content1 ? (content1.scrollWidth || 0) : 0;
             curW2 = content2 ? (content2.scrollWidth || 0) : 0;
             steps++;
@@ -3761,6 +3771,11 @@ function setupDraggableSubtitle() {
         state.isAutoFitEnabled = e.target.checked;
         updateKaraokeStage(beatAudio.currentTime);
         showToastNotification(e.target.checked ? "Đã BẬT Auto-Fit chống tràn viền" : "Đã TẮT Auto-Fit");
+    });
+
+    // Nút Tự Động Cắt Dòng Trực Tiếp Trong Studio (Card 2)
+    document.getElementById("btnAutoSplitInStudio")?.addEventListener("click", () => {
+        autoSplitProjectSegments(5, 24);
     });
 
     // Floating HUD Quick Zoom Buttons
@@ -4324,23 +4339,7 @@ function renderKaraokeLine(container, segment, currentTime) {
         }
 
         const baseFontSize = (state.fontSizeLine1 || state.fontSizeLine2 || 54);
-        let uniformFs = baseFontSize;
-        if (state.isAutoFitEnabled !== false && segment) {
-            const stageScreen = document.getElementById("stageScreen");
-            const stageW = stageScreen?.clientWidth || 1200;
-            const maxSafeW = Math.round(stageW * 0.85);
-            const font = (state.fontName || "Tahoma").replace(/['"]/g, "").split(",")[0].trim();
-            const text = (segment.text || "").trim();
-            if (text) {
-                const w = measureKaraokeTextWidth(text, baseFontSize, font);
-                const wordCount = text.split(/\s+/).length;
-                const adjustedW = w + (wordCount * 8) + 36;
-                if (adjustedW > maxSafeW) {
-                    uniformFs = Math.max(22, Math.floor((maxSafeW / adjustedW) * baseFontSize));
-                }
-            }
-        }
-        contentEl.style.fontSize = `${uniformFs}px`;
+        contentEl.style.fontSize = `${baseFontSize}px`;
     }
 
     // 2. High-performance 60 FPS Continuous Progressive Wipe (Adobe Premiere / Sayatoo / KTV style)
@@ -4394,6 +4393,85 @@ function renderKaraokeLine(container, segment, currentTime) {
     activeLayer.style.clipPath = `inset(0 ${Math.max(0, 100 - revealPct).toFixed(2)}% 0 0)`;
 }
 
+
+/* ========================================================
+   6. AUTO SPLIT LONG LINES (CHIA CÂU DÀI CHUẨN KTV)
+   ======================================================== */
+async function autoSplitProjectSegments(maxWords = 5, maxChars = 24) {
+    if (!state.currentProject || !state.currentProject.segments || !state.currentProject.segments.length) {
+        showToastNotification("Vui lòng mở một bài hát trước khi cắt dòng!");
+        return;
+    }
+
+    const btnStudio = document.getElementById("btnAutoSplitInStudio");
+    const btnEditor = document.getElementById("btnAutoSplitLongLines");
+    const origStudioHtml = btnStudio ? btnStudio.innerHTML : "";
+    const origEditorText = btnEditor ? btnEditor.textContent : "";
+
+    if (btnStudio) {
+        btnStudio.disabled = true;
+        btnStudio.innerHTML = `<span>Đang Cắt Dòng...</span>`;
+    }
+    if (btnEditor) {
+        btnEditor.disabled = true;
+        btnEditor.textContent = "Đang Cắt Dòng...";
+    }
+
+    try {
+        let newSegments = null;
+        const projId = state.currentProject.id;
+        if (projId) {
+            try {
+                const res = await fetch(`/api/split-long-segments/${projId}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ max_words: maxWords, max_chars: maxChars })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.segments && data.segments.length) {
+                        newSegments = data.segments;
+                    }
+                }
+            } catch (apiErr) {
+                console.warn("Backend split API error, falling back to local:", apiErr);
+            }
+        }
+
+        if (!newSegments) {
+            newSegments = ensureConciseSegments(state.currentProject.segments, maxWords, maxChars, 3.6);
+            if (typeof saveProjectStageSettings === "function") {
+                await saveProjectStageSettings();
+            }
+        }
+
+        state.currentProject.segments = newSegments;
+        state._memoizedTimeline = null;
+        state._memoizedTimelineSegsRef = null;
+        state._memoizedPairs = null;
+        state._memoizedSegsRef = null;
+        state._cachedSongSafeSize = null;
+        state._cachedSongSafeSizeSegsRef = null;
+
+        renderEditorTable(newSegments);
+        renderLyricJumpList(newSegments);
+        updateKaraokeStage(beatAudio.currentTime || 0);
+
+        showToastNotification(`Đã tự động cắt câu dài thành ${newSegments.length} dòng ngắn gọn chuẩn KTV!`);
+    } catch (err) {
+        console.error("Split error:", err);
+        showToastNotification("Lỗi cắt dòng: " + err.message);
+    } finally {
+        if (btnStudio) {
+            btnStudio.disabled = false;
+            btnStudio.innerHTML = origStudioHtml;
+        }
+        if (btnEditor) {
+            btnEditor.disabled = false;
+            btnEditor.textContent = origEditorText;
+        }
+    }
+}
 
 /* ========================================================
    6. LYRICS & TIMING EDITOR & DRAWER
@@ -4541,67 +4619,7 @@ function setupEditor() {
     });
 
     const btnAutoSplitLongLines = document.getElementById("btnAutoSplitLongLines");
-    btnAutoSplitLongLines?.addEventListener("click", () => {
-        if (!state.currentProject || !state.currentProject.segments) {
-            alert("Chưa có dữ liệu bài hát để chia câu!");
-            return;
-        }
-
-        let originalSegments = state.currentProject.segments;
-        let newSegments = [];
-
-        function splitSegmentObj(seg) {
-            const words = seg.words || [];
-            if (words.length <= 5 && (seg.end - seg.start) <= 3.2) {
-                return [seg];
-            }
-            if (words.length < 4) return [seg];
-
-            let splitIdx = Math.floor(words.length / 2);
-            for (let i = Math.max(1, Math.floor(words.length * 0.3)); i <= Math.min(words.length - 2, Math.floor(words.length * 0.7)); i++) {
-                const w = words[i].word || "";
-                if (/[,\.;\-!\?]/.test(w)) {
-                    splitIdx = i + 1;
-                    break;
-                }
-            }
-
-            const wordsA = words.slice(0, splitIdx);
-            const wordsB = words.slice(splitIdx);
-
-            if (!wordsA.length || !wordsB.length) return [seg];
-
-            const segA = {
-                id: 0,
-                start: wordsA[0].start,
-                end: wordsA[wordsA.length - 1].end,
-                text: wordsA.map(w => w.word).join(" "),
-                words: wordsA,
-                role: seg.role || "all"
-            };
-            const segB = {
-                id: 0,
-                start: wordsB[0].start,
-                end: wordsB[wordsB.length - 1].end,
-                text: wordsB.map(w => w.word).join(" "),
-                words: wordsB,
-                role: seg.role || "all"
-            };
-
-            return [...splitSegmentObj(segA), ...splitSegmentObj(segB)];
-        }
-
-        originalSegments.forEach(seg => {
-            newSegments.push(...splitSegmentObj(seg));
-        });
-
-        newSegments.forEach((seg, idx) => { seg.id = idx; });
-        state.currentProject.segments = newSegments;
-        renderEditorTable(newSegments);
-        renderLyricJumpList(newSegments);
-        updateKaraokeStage(beatAudio.currentTime);
-        alert(`Đã tự động chia các câu dài thành công! Hiện có ${newSegments.length} dòng.`);
-    });
+    btnAutoSplitLongLines?.addEventListener("click", () => autoSplitProjectSegments(5, 24));
 
     const btnImportSubFile = document.getElementById("btnImportSubFile");
     const importSubFileInput = document.getElementById("importSubFileInput");

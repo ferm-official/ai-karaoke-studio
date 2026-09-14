@@ -6,7 +6,7 @@
     <title>AI Karaoke Studio Pro — Local GPU Engine</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Anton&family=Baloo+2:wght@600;700;800&family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&family=Dancing+Script:wght@700&family=Lexend:wght@400;600;700;800&family=Lobster&family=Montserrat:wght@400;500;600;700;800;900&family=Noto+Serif:wght@600;700&family=Nunito:wght@400;600;700;800;900&family=Oswald:wght@600;700&family=Outfit:wght@300;400;500;600;700;800;900&family=Pattaya&family=Playfair+Display:wght@700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Roboto:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css?v=72.0">
+    <link rel="stylesheet" href="/static/style.css?v=73.0">
 </head>
 <body>
     <div class="app-background">
@@ -548,6 +548,17 @@
                                     </span>
                                 </label>
                             </div>
+
+                            <!-- Tự Động Cắt Dòng (Chia Câu Dài Chuẩn KTV) -->
+                            <button type="button" class="btn-split-studio" id="btnAutoSplitInStudio" title="Tự động cắt các câu dài trên 5-6 từ thành 2 dòng ngắn gọn chuẩn KTV">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/>
+                                    <line x1="20" y1="4" x2="8.12" y2="15.88"/>
+                                    <line x1="14.47" y1="14.48" x2="20" y2="20"/>
+                                    <line x1="8.12" y1="8.12" x2="12" y2="12"/>
+                                </svg>
+                                <span>Tự Động Cắt Dòng (Chia Câu Dài)</span>
+                            </button>
                         </div>
 
                         <!-- Card 3: Tùy Chỉnh Font & Màu Chữ -->
@@ -975,7 +986,7 @@
         </div>
     </div>
 
-    <script src="/static/app.js?v=72.0"></script>
+    <script src="/static/app.js?v=73.0"></script>
 </body>
 </html>
 
