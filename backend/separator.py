@@ -141,8 +141,8 @@ def separate_audio(
         str(input_path)
     ]
     if device == "cpu":
-        # Ultra-fast CPU separation: overlap=0.10 (saves 40% FFTs), shifts=1 (no redundant phase shifts), segment=8 (fits L3 cache)
-        cmd.extend(["--overlap", "0.10", "--shifts", "1", "--segment", "8"])
+        # Ultra-fast CPU separation: overlap=0.10 (saves 40% FFTs), shifts=1 (no redundant phase shifts), segment=7 (htdemucs max is 7.8)
+        cmd.extend(["--overlap", "0.10", "--shifts", "1", "--segment", "7"])
 
     logger.info(f"Running Demucs separation: {' '.join(cmd)}")
     
@@ -164,6 +164,7 @@ def separate_audio(
         env=demucs_env
     )
 
+    output_lines = []
     buffer = ""
     while True:
         char = process.stdout.read(1)
@@ -173,6 +174,9 @@ def separate_audio(
             line_str = buffer.strip()
             buffer = ""
             if line_str:
+                output_lines.append(line_str)
+                if len(output_lines) > 30:
+                    output_lines.pop(0)
                 logger.debug(f"[Demucs] {line_str}")
                 if "%" in line_str and progress_callback:
                     try:
@@ -187,7 +191,8 @@ def separate_audio(
 
     process.wait()
     if process.returncode != 0:
-        raise RuntimeError(f"Demucs separation failed with exit code {process.returncode}")
+        err_detail = "\n".join(output_lines[-10:])
+        raise RuntimeError(f"Demucs separation failed with exit code {process.returncode}:\n{err_detail}")
 
     track_stem_dir = out_dir / "_raw_stems" / model_name / input_path.stem
     if not track_stem_dir.exists():
