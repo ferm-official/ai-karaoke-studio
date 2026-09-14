@@ -455,9 +455,39 @@ function resetCreationForm() {
     if (lyricsInput) lyricsInput.value = "";
     const badge = document.getElementById("lyricsStatusBadge");
     if (badge) badge.style.display = "none";
+
+    state.pendingBgFile = null;
+    const createBgFileInput = document.getElementById("createBgFileInput");
+    if (createBgFileInput) createBgFileInput.value = "";
+    const createBgFileName = document.getElementById("createBgFileName");
+    if (createBgFileName) createBgFileName.textContent = "Chưa chọn (Dùng nền Studio)";
+    const btnClearCreateBg = document.getElementById("btnClearCreateBg");
+    if (btnClearCreateBg) btnClearCreateBg.style.display = "none";
 }
 
 function setupUploadHandlers() {
+    // Initial Background Upload (Tab 1)
+    const btnChooseCreateBg = document.getElementById("btnChooseCreateBg");
+    const createBgFileInput = document.getElementById("createBgFileInput");
+    const createBgFileName = document.getElementById("createBgFileName");
+    const btnClearCreateBg = document.getElementById("btnClearCreateBg");
+
+    btnChooseCreateBg?.addEventListener("click", () => createBgFileInput?.click());
+    createBgFileInput?.addEventListener("change", (e) => {
+        if (e.target.files.length > 0) {
+            const file = e.target.files[0];
+            state.pendingBgFile = file;
+            if (createBgFileName) createBgFileName.textContent = `${file.name} (${(file.size / (1024 * 1024)).toFixed(1)} MB)`;
+            if (btnClearCreateBg) btnClearCreateBg.style.display = "inline-flex";
+        }
+    });
+    btnClearCreateBg?.addEventListener("click", () => {
+        state.pendingBgFile = null;
+        if (createBgFileInput) createBgFileInput.value = "";
+        if (createBgFileName) createBgFileName.textContent = "Chưa chọn (Dùng nền Studio)";
+        btnClearCreateBg.style.display = "none";
+    });
+
     modeFileBtn.addEventListener("click", () => {
         modeFileBtn.classList.add("active");
         modeUrlBtn.classList.remove("active");
@@ -977,8 +1007,26 @@ function startPollingStatus(projectId) {
             if (job.status === "ready") {
                 clearInterval(state.pollTimer);
                 updateModalProgress({ progress: 100, message: "Đã hoàn tất xử lý! Đang mở phòng thu Karaoke..." });
-                setTimeout(() => {
+                setTimeout(async () => {
                     hideProgressModal();
+                    if (state.pendingBgFile) {
+                        const bgFile = state.pendingBgFile;
+                        state.pendingBgFile = null;
+                        const bgFormData = new FormData();
+                        bgFormData.append("file", bgFile);
+                        try {
+                            const bgRes = await fetch(`/api/upload-background/${projectId}`, {
+                                method: "POST",
+                                body: bgFormData
+                            });
+                            if (bgRes.ok) {
+                                const bgData = await bgRes.json();
+                                job.data.custom_background_url = bgData.url;
+                            }
+                        } catch(e) {
+                            console.error("Upload pending background failed:", e);
+                        }
+                    }
                     loadProjectData(job.data);
                     switchTab("playerTab");
                     resetCreationForm();
@@ -1196,6 +1244,8 @@ function loadProjectData(projectData) {
     // Ensure segments conform to natural singable line lengths (concise, <= 7 words per line)
     projectData.segments = ensureConciseSegments(projectData.segments || [], 7);
     state.currentProject.segments = projectData.segments;
+    state._memoizedTimeline = null;
+    state._memoizedTimelineSegsRef = null;
     state._memoizedPairs = null;
     state._memoizedSegsRef = null;
     state._cachedSongSafeSize = null;
@@ -1221,7 +1271,51 @@ function loadProjectData(projectData) {
     const savedSize = saved.font_size_line1 || saved.font_size_line2 || projectData.font_size_line1 || projectData.font_size_line2 || 52;
     applyMasterFontSize(savedSize);
 
-    state.bgTheme = saved.bg_theme || "nebula";
+    // Restore Background (Custom Image/Video or Preset Theme)
+    const stageScreen = document.getElementById("stageScreen") || document.getElementById("karaokeScreen");
+    if (stageScreen) {
+        const oldMedia = stageScreen.querySelector(".stage-screen-bg-media");
+        if (oldMedia) oldMedia.remove();
+
+        const customBg = projectData.custom_background_url || saved.custom_background_url || null;
+        if (customBg) {
+            state.customBgPath = customBg;
+            const isVideo = customBg.match(/\.(mp4|webm|mov|mkv)$/i);
+            let mediaEl;
+            if (isVideo) {
+                mediaEl = document.createElement("video");
+                mediaEl.src = customBg;
+                mediaEl.autoplay = true;
+                mediaEl.loop = true;
+                mediaEl.muted = true;
+                mediaEl.playsInline = true;
+            } else {
+                mediaEl = document.createElement("img");
+                mediaEl.src = customBg;
+            }
+            mediaEl.className = "stage-screen-bg-media";
+            stageScreen.prepend(mediaEl);
+
+            const bgFileName = document.getElementById("stageBgFileName");
+            if (bgFileName) bgFileName.textContent = "Nền tùy chỉnh: " + customBg.split("/").pop();
+            const btnClearBg = document.getElementById("btnClearStageBg");
+            if (btnClearBg) btnClearBg.style.display = "inline-flex";
+            document.querySelectorAll(".bg-chip").forEach(c => c.classList.remove("active"));
+        } else {
+            state.customBgPath = null;
+            const bgTheme = saved.bg_theme || "nebula";
+            state.bgTheme = bgTheme;
+            stageScreen.classList.remove("bg-nebula", "bg-cyber", "bg-gold", "bg-black", "bg-sunset", "bg-sakura");
+            stageScreen.classList.add(`bg-${bgTheme}`);
+            document.querySelectorAll(".bg-chip").forEach(c => {
+                c.classList.toggle("active", c.getAttribute("data-bg") === bgTheme);
+            });
+            const bgFileName = document.getElementById("stageBgFileName");
+            if (bgFileName) bgFileName.textContent = "Hỗ trợ ảnh JPG/PNG hoặc Video MP4";
+            const btnClearBg = document.getElementById("btnClearStageBg");
+            if (btnClearBg) btnClearBg.style.display = "none";
+        }
+    }
 
     const fontToApply = saved.font_name || projectData.font_name || "Tahoma, sans-serif";
     applyStageFont(fontToApply);
@@ -2408,10 +2502,52 @@ function initMasterQuickActions() {
         }
     });
 
-    // 4. Quick Export Master Jump
+    // 4. Dedicated "Lưu Cài Đặt" Button in Studio
+    const btnSaveStudioSettings = document.getElementById("btnSaveStudioSettings");
+    btnSaveStudioSettings?.addEventListener("click", async () => {
+        if (!state.currentProject) {
+            showToastNotification("Chưa có bài hát nào được nạp!");
+            return;
+        }
+        btnSaveStudioSettings.disabled = true;
+        const originalText = btnSaveStudioSettings.textContent;
+        btnSaveStudioSettings.textContent = "Đang lưu...";
+        try {
+            await saveProjectStageSettings();
+            showToastNotification("Đã lưu toàn bộ cài đặt bài hát thành công!");
+        } catch (err) {
+            console.error("Save settings error:", err);
+            showToastNotification("Không thể lưu cài đặt bài hát.");
+        } finally {
+            btnSaveStudioSettings.disabled = false;
+            btnSaveStudioSettings.textContent = originalText;
+        }
+    });
+
+    // 5. 1-Click Direct "Xuất Video MP4 Full HD"
     const btnExportMaster = document.getElementById("btnExportMaster");
-    btnExportMaster?.addEventListener("click", () => {
-        switchTab("exportTab");
+    btnExportMaster?.addEventListener("click", async () => {
+        if (!state.currentProject) {
+            showToastNotification("Chưa có bài hát nào được nạp để xuất video!");
+            return;
+        }
+        btnExportMaster.disabled = true;
+        const origText = btnExportMaster.textContent;
+        btnExportMaster.textContent = "Đang Chuẩn Bị Xuất...";
+        try {
+            // 1. Auto-save all stage settings first
+            await saveProjectStageSettings();
+            showToastNotification("Đang bắt đầu xuất video Full HD (GPU NVENC)...");
+
+            // 2. Switch to Export tab and immediately trigger direct render!
+            switchTab("exportTab");
+            await handleStartRender();
+        } catch (err) {
+            console.error("Direct export error:", err);
+        } finally {
+            btnExportMaster.disabled = false;
+            btnExportMaster.textContent = origText;
+        }
     });
 }
 
@@ -3851,7 +3987,8 @@ function getAlternatingTimeline(segments) {
         const stanza = stanzas[stIdx];
         const s0 = stanza[0];
         const s0Lead = Math.max(0.0, s0.start - defaultLeadIn);
-        const stanzaEntry = stIdx > 0 ? Math.max(prevStanzaEnd + 0.1, s0Lead) : s0Lead;
+        // Stanza 0 always starts from 0.0s so lyrics for song intro are visible right away
+        const stanzaEntry = stIdx > 0 ? Math.max(prevStanzaEnd + 0.1, s0Lead) : 0.0;
 
         const slot1Segs = []; // Even indices within stanza (Hàng 1)
         const slot2Segs = []; // Odd indices within stanza (Hàng 2)
@@ -3968,7 +4105,7 @@ function updateKaraokeStageCouplet(currentTime, segments) {
         const segB = p.length > 1 ? p[1] : null;
 
         const prevEnd = pIdx > 0 ? (pairs[pIdx - 1][pairs[pIdx - 1].length - 1].end) : 0.0;
-        const pairLeadIn = pIdx === 0 ? Math.max(0.0, segA.start - 2.5) : Math.max(prevEnd, segA.start - 2.5);
+        const pairLeadIn = pIdx === 0 ? 0.0 : Math.max(prevEnd, segA.start - 2.5);
         
         const pairSingEnd = segB ? segB.end : segA.end;
         const nextStart = pIdx < pairs.length - 1 ? pairs[pIdx + 1][0].start : 99999.0;
@@ -3994,30 +4131,27 @@ function updateKaraokeStageCouplet(currentTime, segments) {
     }
 
     if (!activePair) {
-        if (nextPair) {
+        if (pairs.length > 0 && currentTime < pairs[0][0].start) {
+            // Intro: Always show the first couplet!
+            activePair = pairs[0];
+        } else if (nextPair) {
             const timeToNext = nextPair[0].start - currentTime;
-            if (timeToNext <= 2.5) {
+            if (timeToNext <= 8.0) {
                 activePair = nextPair;
-            } else if (prevPair && (currentTime - prevPair[prevPair.length - 1].end) <= 0.8) {
+            } else if (prevPair && (currentTime - prevPair[prevPair.length - 1].end) <= 1.5) {
                 activePair = prevPair;
             } else {
-                renderKaraokeLine(kLine1, null, currentTime);
-                renderKaraokeLine(kLine2, null, currentTime);
-                return;
+                activePair = nextPair;
             }
-        } else {
-            if (prevPair && (currentTime - prevPair[prevPair.length - 1].end) <= 0.8) {
-                activePair = prevPair;
-            } else {
-                renderKaraokeLine(kLine1, null, currentTime);
-                renderKaraokeLine(kLine2, null, currentTime);
-                return;
-            }
+        } else if (prevPair) {
+            activePair = prevPair;
+        } else if (pairs.length > 0) {
+            activePair = pairs[0];
         }
     }
 
-    const line1Seg = activePair[0] || null;
-    const line2Seg = activePair.length > 1 ? activePair[1] : null;
+    const line1Seg = activePair ? activePair[0] : null;
+    const line2Seg = (activePair && activePair.length > 1) ? activePair[1] : null;
 
     renderKaraokeLine(kLine1, line1Seg, currentTime);
     renderKaraokeLine(kLine2, line2Seg, currentTime);
@@ -4068,6 +4202,19 @@ function updateKaraokeStage(currentTime) {
             }
         }
         if (slot1Seg && slot2Seg) break;
+    }
+
+    // Rock-solid Fallback: If before the first line starts singing (intro), ensure lines 1 & 2 are displayed
+    if (!slot1Seg && !slot2Seg && timeline.length > 0) {
+        if (currentTime < timeline[0].seg.start) {
+            for (let i = 0; i < timeline.length; i++) {
+                const item = timeline[i];
+                if (item.stanzaIdx === 0) {
+                    if (item.slot === 1 && !slot1Seg) slot1Seg = item.seg;
+                    if (item.slot === 2 && !slot2Seg) slot2Seg = item.seg;
+                }
+            }
+        }
     }
 
     renderKaraokeLine(kLine1, slot1Seg, currentTime);
@@ -5150,9 +5297,18 @@ function setupExport() {
                 const existingMedia = stageScreen.querySelector(".stage-screen-bg-media");
                 if (existingMedia) existingMedia.remove();
 
-                // Clear classes
-                stageScreen.className = "stage-screen";
+                state.customBgPath = null;
+                state.bgTheme = bgType;
+                stageScreen.classList.remove("bg-nebula", "bg-cyber", "bg-gold", "bg-black", "bg-sunset", "bg-sakura");
                 stageScreen.classList.add(`bg-${bgType}`);
+
+                const bgFileName = document.getElementById("stageBgFileName");
+                if (bgFileName) bgFileName.textContent = "Nền Studio: " + bgType.toUpperCase();
+                const btnClearBg = document.getElementById("btnClearStageBg");
+                if (btnClearBg) btnClearBg.style.display = "none";
+                if (typeof saveProjectStageSettings === "function") {
+                    saveProjectStageSettings();
+                }
             }
         });
     });
@@ -5184,6 +5340,12 @@ function setupExport() {
             mediaEl.className = "stage-screen-bg-media";
             stageScreen.prepend(mediaEl);
 
+            bgChips.forEach(c => c.classList.remove("active"));
+            const bgFileName = document.getElementById("stageBgFileName");
+            if (bgFileName) bgFileName.textContent = `Đã chọn: ${file.name}`;
+            const btnClearBg = document.getElementById("btnClearStageBg");
+            if (btnClearBg) btnClearBg.style.display = "inline-flex";
+
             // If project is loaded, also upload to server
             if (state.currentProject) {
                 const formData = new FormData();
@@ -5196,13 +5358,40 @@ function setupExport() {
                     const data = await res.json();
                     if (res.ok) {
                         state.customBgPath = data.url;
-                        if (bgStatusText) bgStatusText.textContent = `Đã chọn: ${file.name}`;
+                        if (typeof saveProjectStageSettings === "function") {
+                            await saveProjectStageSettings();
+                        }
+                        showToastNotification("Đã lưu hình nền tùy chọn cho bài hát!");
                     }
                 } catch (err) {
                     console.error("Upload BG failed:", err);
+                    showToastNotification("Lỗi tải hình nền lên máy chủ.");
                 }
             }
         }
+    });
+
+    // Clear custom background button
+    const btnClearStageBg = document.getElementById("btnClearStageBg");
+    btnClearStageBg?.addEventListener("click", async () => {
+        const existingMedia = stageScreen?.querySelector(".stage-screen-bg-media");
+        if (existingMedia) existingMedia.remove();
+
+        state.customBgPath = null;
+        state.bgTheme = "nebula";
+        if (stageBgFileInput) stageBgFileInput.value = "";
+        if (stageScreen) {
+            stageScreen.classList.remove("bg-nebula", "bg-cyber", "bg-gold", "bg-black", "bg-sunset", "bg-sakura");
+            stageScreen.classList.add("bg-nebula");
+        }
+        bgChips.forEach(c => c.classList.toggle("active", c.dataset.bg === "nebula"));
+        const bgFileName = document.getElementById("stageBgFileName");
+        if (bgFileName) bgFileName.textContent = "Hỗ trợ ảnh JPG/PNG hoặc Video MP4";
+        if (btnClearStageBg) btnClearStageBg.style.display = "none";
+        if (typeof saveProjectStageSettings === "function") {
+            await saveProjectStageSettings();
+        }
+        showToastNotification("Đã xoá nền riêng, trở về nền Studio mặc định.");
     });
 
     // 1. Stage Screen Floating Color Dock listeners (Chỉnh màu ngay trên màn hình)

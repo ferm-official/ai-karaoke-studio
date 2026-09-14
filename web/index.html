@@ -6,7 +6,7 @@
     <title>AI Karaoke Studio Pro — Local GPU Engine</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Anton&family=Baloo+2:wght@600;700;800&family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&family=Dancing+Script:wght@700&family=Lexend:wght@400;600;700;800&family=Lobster&family=Montserrat:wght@400;500;600;700;800;900&family=Noto+Serif:wght@600;700&family=Nunito:wght@400;600;700;800;900&family=Oswald:wght@600;700&family=Outfit:wght@300;400;500;600;700;800;900&family=Pattaya&family=Playfair+Display:wght@700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Roboto:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css?v=71.0">
+    <link rel="stylesheet" href="/static/style.css?v=72.0">
 </head>
 <body>
     <div class="app-background">
@@ -35,7 +35,6 @@
             <button type="button" class="system-version-pill" id="btnVersionPill" title="Phiên bản test 1.0.000 • Bấm để xem thông báo và cập nhật">
                 <span class="version-dot"></span>
                 <span class="version-name" id="appVersionName">test 1.0.000</span>
-                <span class="version-bell-icon" id="versionBellIcon">🔔</span>
                 <span class="version-badge-notify" id="versionBadgeNotify" style="display: none;">CÓ BẢN MỚI</span>
             </button>
 
@@ -170,6 +169,22 @@
                             <div>
                                 <label class="input-label" for="stemsSongTitle">Tên bài hát</label>
                                 <input type="text" id="stemsSongTitle" class="text-input" placeholder="Nhập tên bài hát (Ví dụ: Một Bữa Cơm)...">
+                            </div>
+                        </div>
+
+                        <!-- Optional Background Media Selection from start -->
+                        <div class="initial-bg-wrap" style="margin-top: 12px; background: rgba(255, 255, 255, 0.02); border: 1px dashed rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 10px 12px;">
+                            <label class="input-label" style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                                <span>Ảnh / Video Nền Cho Bài Hát (Tùy chọn)</span>
+                                <span style="font-size: 0.72rem; color: var(--text-muted);">Ảnh JPG/PNG hoặc Video MP4</span>
+                            </label>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <input type="file" id="createBgFileInput" accept="image/*,video/*" hidden>
+                                <button type="button" class="btn-secondary btn-sm" id="btnChooseCreateBg" style="padding: 6px 12px; font-size: 0.78rem; border-radius: 6px; cursor: pointer;">
+                                    Chọn Ảnh / Video Nền
+                                </button>
+                                <span id="createBgFileName" style="font-size: 0.78rem; color: var(--text-secondary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Chưa chọn (Dùng nền Studio)</span>
+                                <button type="button" id="btnClearCreateBg" style="display: none; background: transparent; border: none; color: #f87171; cursor: pointer; font-size: 0.88rem; padding: 0 4px;" title="Bỏ chọn">✕</button>
                             </div>
                         </div>
 
@@ -326,9 +341,6 @@
                     <!-- ==================== CỘT TRÁI: VẬN HÀNH & ÂM THANH ==================== -->
                     <aside class="studio-side-col sidebar-left" id="sidebarLeft">
                         <div class="col-header-main">
-                            <span class="col-header-icon">
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-                            </span>
                             <span class="col-header-title">VẬN HÀNH & ÂM THANH</span>
                             <span class="col-header-tag">LIVE</span>
                         </div>
@@ -336,12 +348,7 @@
                         <!-- Card 1: Mixer Âm Lượng -->
                         <div class="c-card">
                             <div class="c-card-title">
-                                <div class="card-title-left">
-                                    <span class="card-title-icon">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
-                                    </span>
-                                    <span>Âm Lượng Track</span>
-                                </div>
+                                <span>Âm Lượng Track</span>
                             </div>
                             <!-- Beat Slider -->
                             <div class="fader-group">
@@ -366,12 +373,7 @@
                         <!-- Card 2: Nâng Hạ Tone -->
                         <div class="c-card">
                             <div class="c-card-title">
-                                <div class="card-title-left">
-                                    <span class="card-title-icon">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-                                    </span>
-                                    <span>Tone Nhạc (Nửa Cung)</span>
-                                </div>
+                                <span>Tone Nhạc (Nửa Cung)</span>
                                 <span class="fader-val" id="pitchValText">0</span>
                             </div>
                             <div class="tone-actions-row">
@@ -384,12 +386,7 @@
                         <!-- Card 3: Căn Chỉnh Nhịp (Sync Offset) -->
                         <div class="c-card">
                             <div class="c-card-title">
-                                <div class="card-title-left">
-                                    <span class="card-title-icon">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                                    </span>
-                                    <span>Đồng Bộ Lời & Nhịp</span>
-                                </div>
+                                <span>Đồng Bộ Lời & Nhịp</span>
                                 <span class="fader-val" id="offsetValText">0 ms</span>
                             </div>
                             <div class="sync-actions-row">
@@ -407,16 +404,10 @@
                         <!-- Card 4: Micro Phòng Thu -->
                         <div class="c-card">
                             <div class="c-card-title">
-                                <div class="card-title-left">
-                                    <span class="card-title-icon">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
-                                    </span>
-                                    <span>Micro Phòng Thu</span>
-                                </div>
+                                <span>Micro Phòng Thu</span>
                                 <span class="mic-status-indicator" id="micLiveIndicator"></span>
                             </div>
                             <button type="button" class="btn-mic-hero" id="btnToggleMic">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>
                                 <span id="micToggleText">Bật Micro Live</span>
                             </button>
                             
@@ -507,9 +498,6 @@
                     <!-- ==================== CỘT PHẢI: THẨM MỸ, TÙY BIẾN & XUẤT ==================== -->
                     <aside class="studio-side-col sidebar-right" id="sidebarRight">
                         <div class="col-header-main">
-                            <span class="col-header-icon">
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
-                            </span>
                             <span class="col-header-title">THẨM MỸ & XUẤT BẢN</span>
                             <span class="col-header-tag">STYLES</span>
                         </div>
@@ -603,16 +591,34 @@
                             </div>
                         </div>
 
-                        <!-- Card 4: Hành Động Rạp Chiếu & Xuất File -->
+                        <!-- Card 4: Hình Nền Sân Khấu (Ảnh / Video) -->
+                        <div class="c-card" id="cardStageBackground">
+                            <div class="c-card-title"><span>Hình Nền Sân Khấu</span></div>
+                            <div class="bg-preset-chips" style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;">
+                                <button type="button" class="bg-chip active" data-bg="nebula">Studio</button>
+                                <button type="button" class="bg-chip" data-bg="cyber">Cyber</button>
+                                <button type="button" class="bg-chip" data-bg="gold">Gold</button>
+                                <button type="button" class="bg-chip" data-bg="black">Đen Tuyền</button>
+                                <button type="button" class="bg-chip" data-bg="sunset">Sunset</button>
+                                <button type="button" class="bg-chip" data-bg="sakura">Sakura</button>
+                            </div>
+                            <div class="custom-bg-upload-wrap">
+                                <input type="file" id="stageBgFileInput" accept="image/*,video/*" hidden>
+                                <div style="display: flex; gap: 6px; align-items: center;">
+                                    <button type="button" class="btn-secondary btn-sm" id="btnUploadStageBg" style="flex: 1; padding: 6px 10px; font-size: 0.78rem;">Tải Ảnh / Video Nền</button>
+                                    <button type="button" class="btn-clear-bg" id="btnClearStageBg" style="display: none; padding: 5px 8px; font-size: 0.75rem; border-radius: 6px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; cursor: pointer;" title="Xoá nền tùy chỉnh, dùng nền mặc định">✕</button>
+                                </div>
+                                <span class="hint-subtext" id="stageBgFileName" style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 4px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Hỗ trợ ảnh JPG/PNG hoặc Video MP4</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 5: Hành Động Rạp Chiếu, Lưu & Xuất File -->
                         <div class="c-card" style="margin-top: auto;">
-                            <button type="button" class="btn-cinema-mode" id="btnCinemaMaster">
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
-                                <span>Rạp Chiếu (Toàn Màn Hình)</span>
-                            </button>
-                            <button type="button" class="btn-export-mp4" id="btnExportMaster" style="margin-top: 8px;">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                <span>XUẤT VIDEO MP4 FULL HD</span>
-                            </button>
+                            <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+                                <button type="button" class="btn-secondary-studio" id="btnSaveStudioSettings" style="flex: 1; padding: 8px 10px; font-size: 0.82rem; font-weight: 600; border-radius: 8px; background: rgba(0, 242, 254, 0.1); border: 1px solid var(--cyan-accent); color: var(--cyan-accent); cursor: pointer;" title="Lưu lại cấu hình bài hát hiện tại">Lưu Cài Đặt</button>
+                                <button type="button" class="btn-cinema-mode" id="btnCinemaMaster" style="flex: 1; margin: 0; padding: 8px 10px; font-size: 0.82rem;">Rạp Chiếu</button>
+                            </div>
+                            <button type="button" class="btn-export-mp4" id="btnExportMaster" style="margin-top: 0; width: 100%;">XUẤT VIDEO MP4 FULL HD</button>
                         </div>
                     </aside>
 
@@ -918,7 +924,7 @@
         <div class="modal-card glass-card update-modal-card">
             <div class="update-modal-header">
                 <div class="update-header-title-wrap">
-                    <div class="update-bell-icon-wrap">🔔</div>
+                    <div class="update-bell-icon-wrap" style="font-size: 0.72rem; font-weight: 800; color: var(--cyan-accent); letter-spacing: 0.05em; background: rgba(0, 242, 254, 0.1); border: 1px solid rgba(0, 242, 254, 0.3); border-radius: 6px; padding: 4px 8px; display: inline-flex; align-items: center; justify-content: center;">UPDATE</div>
                     <div>
                         <h3 class="modal-title update-title-text">Thông Báo Cập Nhật Phiên Bản</h3>
                         <p class="update-subtitle">AI Karaoke Studio Pro • Hệ Thống Nâng Cấp Tự Động</p>
@@ -962,19 +968,14 @@
 
             <!-- Action Buttons -->
             <div class="update-modal-actions">
-                <button type="button" class="btn-secondary" id="btnCheckUpdateNow">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
-                    Kiểm Tra Lại
-                </button>
-                <button type="button" class="btn-primary btn-do-update" id="btnPerformUpdate">
-                    🚀 Cập Nhật Ngay (1-Click)
-                </button>
+                <button type="button" class="btn-secondary" id="btnCheckUpdateNow">Kiểm Tra Lại</button>
+                <button type="button" class="btn-primary btn-do-update" id="btnPerformUpdate">Cập Nhật Ngay (1-Click)</button>
                 <button type="button" class="btn-secondary" id="btnDismissUpdateModal">Đóng</button>
             </div>
         </div>
     </div>
 
-    <script src="/static/app.js?v=71.0"></script>
+    <script src="/static/app.js?v=72.0"></script>
 </body>
 </html>
 

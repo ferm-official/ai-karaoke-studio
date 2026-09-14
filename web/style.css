@@ -2773,27 +2773,27 @@ body {
 }
 
 /* Dynamic Live Player Background Themes */
-.stage-screen.bg-nebula {
+.stage-screen.bg-nebula, .stage-169-viewport.bg-nebula {
     background: radial-gradient(circle at 50% 50%, #1e1138 0%, #0d0e1b 100%) !important;
 }
 
-.stage-screen.bg-cyber {
+.stage-screen.bg-cyber, .stage-169-viewport.bg-cyber {
     background: linear-gradient(135deg, #051428 0%, #00223e 50%, #04101e 100%) !important;
 }
 
-.stage-screen.bg-gold {
+.stage-screen.bg-gold, .stage-169-viewport.bg-gold {
     background: radial-gradient(circle at 50% 40%, #2a1f0a 0%, #0d0c08 100%) !important;
 }
 
-.stage-screen.bg-black {
+.stage-screen.bg-black, .stage-169-viewport.bg-black {
     background: #000000 !important;
 }
 
-.stage-screen.bg-sunset {
+.stage-screen.bg-sunset, .stage-169-viewport.bg-sunset {
     background: linear-gradient(135deg, #2b0f1a 0%, #441829 50%, #150912 100%) !important;
 }
 
-.stage-screen.bg-sakura {
+.stage-screen.bg-sakura, .stage-169-viewport.bg-sakura {
     background: radial-gradient(circle at 50% 50%, #301323 0%, #120810 100%) !important;
 }
 
@@ -2807,6 +2807,20 @@ body {
     z-index: 1;
     opacity: 0.85;
     pointer-events: none;
+}
+
+.btn-secondary-studio:hover {
+    background: rgba(0, 242, 254, 0.22) !important;
+    border-color: #00f2fe !important;
+    color: #fff !important;
+    box-shadow: 0 0 12px rgba(0, 242, 254, 0.3) !important;
+    transform: translateY(-1px);
+}
+
+.btn-clear-bg:hover {
+    background: rgba(239, 68, 68, 0.3) !important;
+    border-color: #ef4444 !important;
+    color: #fff !important;
 }
 
 /* ========================================================
