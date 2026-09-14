@@ -144,6 +144,7 @@ const stepSub = document.getElementById("stepSub");
    ======================================================== */
 document.addEventListener("DOMContentLoaded", () => {
     fetchSystemInfo();
+    initAppVersionAndUpdateSystem();
     setupNavigation();
     setupUploadHandlers();
     setupPlayer();
@@ -172,6 +173,13 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     } else {
         if (fsParam) applyMasterFontSize(parseInt(fsParam));
+    }
+    const modalParam = urlParams.get("modal");
+    if (modalParam === "update") {
+        setTimeout(() => {
+            const btnVersionPill = document.getElementById("btnVersionPill");
+            btnVersionPill?.click();
+        }, 500);
     }
 });
 
@@ -213,6 +221,133 @@ async function fetchSystemInfo() {
     }
 }
 
+/* ========================================================
+   1.1 APP VERSION & AUTO-UPDATE NOTIFICATION SYSTEM
+   ======================================================== */
+function initAppVersionAndUpdateSystem() {
+    const btnVersionPill = document.getElementById("btnVersionPill");
+    const updateModal = document.getElementById("updateVersionModal");
+    const closeUpdateModalBtn = document.getElementById("closeUpdateModalBtn");
+    const btnDismissUpdateModal = document.getElementById("btnDismissUpdateModal");
+    const btnCheckUpdateNow = document.getElementById("btnCheckUpdateNow");
+    const btnPerformUpdate = document.getElementById("btnPerformUpdate");
+
+    const appVersionName = document.getElementById("appVersionName");
+    const versionBadgeNotify = document.getElementById("versionBadgeNotify");
+    const modalCurrentVer = document.getElementById("modalCurrentVer");
+    const modalUpdateStatus = document.getElementById("modalUpdateStatus");
+    const modalGitCommit = document.getElementById("modalGitCommit");
+    const updateChangelogBox = document.getElementById("updateChangelogBox");
+    const updateConsoleBox = document.getElementById("updateConsoleBox");
+    const updateConsoleLog = document.getElementById("updateConsoleLog");
+
+    const openModal = () => {
+        if (updateModal) updateModal.style.display = "flex";
+        checkUpdate(false);
+    };
+
+    const closeModal = () => {
+        if (updateModal) updateModal.style.display = "none";
+    };
+
+    btnVersionPill?.addEventListener("click", openModal);
+    closeUpdateModalBtn?.addEventListener("click", closeModal);
+    btnDismissUpdateModal?.addEventListener("click", closeModal);
+    updateModal?.addEventListener("click", (e) => {
+        if (e.target === updateModal) closeModal();
+    });
+
+    async function checkUpdate(isManual = false) {
+        if (modalUpdateStatus) modalUpdateStatus.textContent = "Đang kiểm tra kết nối máy chủ...";
+        if (btnCheckUpdateNow) btnCheckUpdateNow.disabled = true;
+
+        try {
+            const res = await fetch("/api/check-update");
+            const data = await res.json();
+
+            const curVer = data.current_version || "test 1.0.000";
+            if (appVersionName) appVersionName.textContent = curVer;
+            if (modalCurrentVer) modalCurrentVer.textContent = curVer;
+            if (modalGitCommit && data.commit) modalGitCommit.textContent = `${data.commit} (main)`;
+
+            if (data.has_update) {
+                btnVersionPill?.classList.add("has-update");
+                if (versionBadgeNotify) versionBadgeNotify.style.display = "inline-block";
+                if (modalUpdateStatus) {
+                    modalUpdateStatus.textContent = `🔔 Có bản cập nhật mới (${data.behind_commits || 1} thay đổi)`;
+                    modalUpdateStatus.style.color = "#F59E0B";
+                }
+                if (btnPerformUpdate) {
+                    btnPerformUpdate.style.display = "inline-flex";
+                    btnPerformUpdate.innerHTML = `🚀 Cập Nhật Ngay (${data.behind_commits || 1} bản mới)`;
+                }
+
+                if (data.changelog && data.changelog.length && updateChangelogBox) {
+                    updateChangelogBox.innerHTML = data.changelog.map(c => `<div class="changelog-item">🔹 ${c}</div>`).join("");
+                }
+
+                if (!isManual) {
+                    showToastNotification(`🔔 Đã có bản cập nhật mới! (Bản hiện tại: ${curVer}). Bấm phiên bản để cập nhật.`);
+                }
+            } else {
+                btnVersionPill?.classList.remove("has-update");
+                if (versionBadgeNotify) versionBadgeNotify.style.display = "none";
+                if (modalUpdateStatus) {
+                    modalUpdateStatus.textContent = data.is_offline ? `Chế độ độc lập (${curVer})` : `✅ Bạn đang dùng phiên bản mới nhất (${curVer})`;
+                    modalUpdateStatus.style.color = "#10B981";
+                }
+                if (btnPerformUpdate) {
+                    btnPerformUpdate.innerHTML = `✅ Hệ Thống Đã Mới Nhất`;
+                }
+                if (isManual) {
+                    showToastNotification(`✅ Bạn đang sử dụng bản mới nhất (${curVer})!`);
+                }
+            }
+        } catch (e) {
+            if (modalUpdateStatus) modalUpdateStatus.textContent = "Sẵn sàng hoạt động cục bộ (test 1.0.000)";
+        } finally {
+            if (btnCheckUpdateNow) btnCheckUpdateNow.disabled = false;
+        }
+    }
+
+    btnCheckUpdateNow?.addEventListener("click", () => checkUpdate(true));
+
+    btnPerformUpdate?.addEventListener("click", async () => {
+        if (!confirm("Bạn có chắc chắn muốn tiến hành cập nhật hệ thống ngay bây giờ không?")) return;
+
+        btnPerformUpdate.disabled = true;
+        btnPerformUpdate.innerHTML = `<span class="spinner-small" style="margin-right: 6px;">⏳</span> Đang cập nhật...`;
+        if (updateConsoleBox) updateConsoleBox.style.display = "block";
+        if (updateConsoleLog) updateConsoleLog.textContent = "[*] Đang kéo bản cập nhật mới nhất từ Git...\n";
+
+        try {
+            const res = await fetch("/api/perform-update", { method: "POST" });
+            const data = await res.json();
+
+            if (updateConsoleLog) updateConsoleLog.textContent += (data.output || "") + "\n";
+
+            if (data.success) {
+                if (updateConsoleLog) updateConsoleLog.textContent += "\n[✔] CẬP NHẬT THÀNH CÔNG! Đang khởi động lại trang...";
+                showToastNotification("🎉 Đã cập nhật thành công! Đang làm mới hệ thống...");
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            } else {
+                if (updateConsoleLog) updateConsoleLog.textContent += `\n[x] Lỗi: ${data.message || "Không thể hoàn thành cập nhật"}`;
+                btnPerformUpdate.disabled = false;
+                btnPerformUpdate.innerHTML = `🚀 Thử Cập Nhật Lại`;
+                showToastNotification("❌ Cập nhật gặp lỗi! Xem chi tiết trong cửa sổ thông báo.");
+            }
+        } catch (err) {
+            if (updateConsoleLog) updateConsoleLog.textContent += `\n[x] Lỗi mạng: ${err.message}`;
+            btnPerformUpdate.disabled = false;
+            btnPerformUpdate.innerHTML = `🚀 Thử Cập Nhật Lại`;
+        }
+    });
+
+    // Auto-check version & update after 2s on startup
+    setTimeout(() => checkUpdate(false), 2000);
+}
 
 /* ========================================================
    2. TAB NAVIGATION

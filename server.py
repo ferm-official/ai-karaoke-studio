@@ -48,9 +48,27 @@ TEST_DIR = BASE_DIR / "test"
 
 PROJECTS_DIR.mkdir(parents=True, exist_ok=True)
 
+VERSION_FILE = BASE_DIR / "version.json"
+
+def get_app_version_info() -> Dict[str, Any]:
+    if VERSION_FILE.exists():
+        try:
+            return json.loads(VERSION_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return {
+        "version": "test 1.0.000",
+        "name": "AI Karaoke Studio Pro",
+        "channel": "test",
+        "build_date": "2026-09-14",
+        "description": "Phiên bản thử nghiệm test 1.0.000"
+    }
+
+CURRENT_VERSION = get_app_version_info().get("version", "test 1.0.000")
+
 JOB_STATUS: Dict[str, Dict[str, Any]] = {}
 
-app = FastAPI(title="Local AI Karaoke Studio", version="1.1.0")
+app = FastAPI(title="Local AI Karaoke Studio", version=CURRENT_VERSION)
 
 app.add_middleware(
     CORSMiddleware,
@@ -449,6 +467,94 @@ async def get_system_info():
         "recommended_profile": recommended_profile,
         "recommended_whisper": recommended_whisper
     }
+
+
+@app.get("/api/version")
+async def get_version():
+    v_data = get_app_version_info()
+    git_hash = ""
+    try:
+        git_hash = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], text=True, timeout=2).strip()
+    except Exception:
+        git_hash = "local"
+    return {
+        "version": v_data.get("version", "test 1.0.000"),
+        "channel": v_data.get("channel", "test"),
+        "build_date": v_data.get("build_date", "2026-09-14"),
+        "commit": git_hash,
+        "description": v_data.get("description", "")
+    }
+
+
+@app.get("/api/check-update")
+async def check_update():
+    v_data = get_app_version_info()
+    cur_ver = v_data.get("version", "test 1.0.000")
+    
+    try:
+        # Check git remote
+        subprocess.run(["git", "fetch", "origin", "main"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=6)
+        
+        # Check commits behind
+        count_res = subprocess.run(["git", "rev-list", "--count", "HEAD..origin/main"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=3)
+        behind = int(count_res.stdout.strip() or "0")
+        
+        if behind > 0:
+            log_res = subprocess.run(["git", "log", "HEAD..origin/main", "--oneline", "-n", "5"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=3)
+            commits = [c.strip() for c in log_res.stdout.strip().split("\n") if c.strip()]
+            return {
+                "has_update": True,
+                "current_version": cur_ver,
+                "behind_commits": behind,
+                "changelog": commits,
+                "message": f"Đã có bản cập nhật mới ({behind} thay đổi mới)!"
+            }
+        else:
+            return {
+                "has_update": False,
+                "current_version": cur_ver,
+                "behind_commits": 0,
+                "changelog": [],
+                "message": f"Bạn đang sử dụng phiên bản mới nhất ({cur_ver})."
+            }
+    except Exception as e:
+        return {
+            "has_update": False,
+            "current_version": cur_ver,
+            "behind_commits": 0,
+            "is_offline": True,
+            "message": f"Hệ thống đang chạy chế độ độc lập (test 1.0.000)."
+        }
+
+
+@app.post("/api/perform-update")
+async def perform_update():
+    try:
+        res = subprocess.run(["git", "pull", "origin", "main"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=35)
+        output = (res.stdout or "") + "\n" + (res.stderr or "")
+        v_data = get_app_version_info()
+        
+        if res.returncode == 0:
+            return {
+                "success": True,
+                "version": v_data.get("version", "test 1.0.000"),
+                "message": "Đã cập nhật phiên bản thành công!",
+                "output": output.strip()
+            }
+        else:
+            return {
+                "success": False,
+                "version": v_data.get("version", "test 1.0.000"),
+                "message": "Quá trình cập nhật báo lỗi hoặc có xung đột file.",
+                "output": output.strip()
+            }
+    except Exception as e:
+        return {
+            "success": False,
+            "version": get_app_version_info().get("version", "test 1.0.000"),
+            "message": f"Lỗi thực thi cập nhật: {str(e)}",
+            "output": str(e)
+        }
 
 
 @app.get("/api/search-lyrics")

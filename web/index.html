@@ -6,7 +6,7 @@
     <title>AI Karaoke Studio Pro — Local GPU Engine</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Anton&family=Baloo+2:wght@600;700;800&family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&family=Dancing+Script:wght@700&family=Lexend:wght@400;600;700;800&family=Lobster&family=Montserrat:wght@400;500;600;700;800;900&family=Noto+Serif:wght@600;700&family=Nunito:wght@400;600;700;800;900&family=Oswald:wght@600;700&family=Outfit:wght@300;400;500;600;700;800;900&family=Pattaya&family=Playfair+Display:wght@700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Roboto:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css?v=70.0">
+    <link rel="stylesheet" href="/static/style.css?v=71.0">
 </head>
 <body>
     <div class="app-background">
@@ -30,6 +30,14 @@
                 <span class="status-dot online"></span>
                 <span class="status-text" id="gpuStatusText">Đang kiểm tra hệ thống...</span>
             </div>
+
+            <!-- Version & Update Notification Pill -->
+            <button type="button" class="system-version-pill" id="btnVersionPill" title="Phiên bản test 1.0.000 • Bấm để xem thông báo và cập nhật">
+                <span class="version-dot"></span>
+                <span class="version-name" id="appVersionName">test 1.0.000</span>
+                <span class="version-bell-icon" id="versionBellIcon">🔔</span>
+                <span class="version-badge-notify" id="versionBadgeNotify" style="display: none;">CÓ BẢN MỚI</span>
+            </button>
 
             <!-- Nav Tabs -->
             <nav class="nav-tabs">
@@ -905,7 +913,68 @@
         </div>
     </div>
 
-    <script src="/static/app.js?v=70.0"></script>
+    <!-- MODAL THÔNG BÁO CẬP NHẬT PHIÊN BẢN -->
+    <div class="modal-overlay" id="updateVersionModal" style="display: none; z-index: 10001;">
+        <div class="modal-card glass-card update-modal-card">
+            <div class="update-modal-header">
+                <div class="update-header-title-wrap">
+                    <div class="update-bell-icon-wrap">🔔</div>
+                    <div>
+                        <h3 class="modal-title update-title-text">Thông Báo Cập Nhật Phiên Bản</h3>
+                        <p class="update-subtitle">AI Karaoke Studio Pro • Hệ Thống Nâng Cấp Tự Động</p>
+                    </div>
+                </div>
+                <button type="button" class="btn-clear" id="closeUpdateModalBtn" style="font-size: 1.4rem; cursor: pointer; color: var(--text-muted);">&times;</button>
+            </div>
+
+            <!-- Version Status Card -->
+            <div class="update-status-card" id="updateStatusCard">
+                <div class="update-info-row">
+                    <span class="update-info-label">Phiên bản hiện tại:</span>
+                    <span class="update-info-val cur-ver" id="modalCurrentVer">test 1.0.000</span>
+                </div>
+                <div class="update-info-row">
+                    <span class="update-info-label">Trạng thái máy chủ:</span>
+                    <span class="update-info-val status-text" id="modalUpdateStatus">Đang kiểm tra...</span>
+                </div>
+                <div class="update-info-row">
+                    <span class="update-info-label">Mã nhánh Git:</span>
+                    <span class="update-info-val commit-hash" id="modalGitCommit">32fbb1a (main)</span>
+                </div>
+            </div>
+
+            <!-- Update Changelog Section -->
+            <div class="update-changelog-section" id="updateChangelogSection">
+                <div class="update-section-title">Nhật ký phiên bản & Tính năng mới:</div>
+                <div class="update-changelog-box" id="updateChangelogBox">
+                    <div class="changelog-item">🔹 <b>Giao diện phòng thu 3 cột chuẩn DAW:</b> Trực quan, full màn hình 100% không gian làm việc.</div>
+                    <div class="changelog-item">🔹 <b>Cỡ chữ siêu to lên đến 110px/120px:</b> Kèm 2 nút tăng giảm nhanh [-] [+] và gõ cỡ chữ tùy biến.</div>
+                    <div class="changelog-item">🔹 <b>Chuẩn hóa KTV Tahoma Bold:</b> 2 dòng so le luân phiên, hiệu ứng quét màu 2 lớp mượt mà.</div>
+                    <div class="changelog-item">🔹 <b>Cập nhật trực tiếp từ thông báo:</b> Tự động kiểm tra và nâng cấp phiên bản chỉ với 1 click.</div>
+                </div>
+            </div>
+
+            <!-- Console Log Box (Show during git pull) -->
+            <div class="update-console-box" id="updateConsoleBox" style="display: none;">
+                <div class="console-title">Tiến trình cập nhật hệ thống:</div>
+                <pre class="console-log-text" id="updateConsoleLog"></pre>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="update-modal-actions">
+                <button type="button" class="btn-secondary" id="btnCheckUpdateNow">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                    Kiểm Tra Lại
+                </button>
+                <button type="button" class="btn-primary btn-do-update" id="btnPerformUpdate">
+                    🚀 Cập Nhật Ngay (1-Click)
+                </button>
+                <button type="button" class="btn-secondary" id="btnDismissUpdateModal">Đóng</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js?v=71.0"></script>
 </body>
 </html>
 
