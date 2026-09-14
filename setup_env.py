@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 AI Karaoke Studio Pro — Automated Environment Setup Script
@@ -10,11 +10,26 @@ import os
 import subprocess
 from pathlib import Path
 
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 def main():
-    print("=" * 65)
+    print("=" * 68)
     print("   AI KARAOKE STUDIO PRO - TỰ ĐỘNG CÀI ĐẶT MÔI TRƯỜNG VIRTUALENV")
-    print("=" * 65)
+    print("=" * 68)
     print()
+
+    # Check Python version
+    major, minor = sys.version_info.major, sys.version_info.minor
+    print(f"[*] Phiên bản Python đang dùng: {major}.{minor}.{sys.version_info.micro}")
+    if major < 3 or (major == 3 and minor < 9):
+        print("[CẢNH BÁO] Bạn đang dùng Python < 3.9. Khuyến nghị dùng Python 3.10 hoặc 3.11 để tương thích tốt nhất.")
+    elif major == 3 and minor >= 13:
+        print("[CẢNH BÁO] Python 3.13+ có thể chưa tương thích hoàn toàn với một số bản build của PyTorch/Demucs.")
 
     base_dir = Path(__file__).resolve().parent
     venv_dir = base_dir / "venv"
@@ -29,25 +44,26 @@ def main():
         pip_venv = venv_dir / "bin" / "pip"
 
     # 1. Create venv if not exists
+    print()
     if not python_venv.exists():
-        print("[*] [1/4] Đang tạo môi trường ảo (venv)...")
+        print("[*] [BƯỚC 1/5] Đang tạo môi trường ảo (virtual environment: venv)...")
         res = subprocess.run([sys.executable, "-m", "venv", str(venv_dir)])
         if res.returncode != 0:
-            print("[LỖI] Không thể tạo thư mục venv!")
+            print("[LỖI] Không thể tạo thư mục venv! Vui lòng kiểm tra quyền truy cập thư mục.")
             sys.exit(1)
         print("[OK] Đã tạo thành công thư mục venv.")
     else:
-        print("[*] [1/4] Thư mục venv đã tồn tại sẵn.")
+        print("[*] [BƯỚC 1/5] Thư mục môi trường 'venv' đã có sẵn.")
 
     # 2. Upgrade pip
     print()
-    print("[*] [2/4] Đang nâng cấp pip, setuptools, wheel trong venv...")
+    print("[*] [BƯỚC 2/5] Nâng cấp công cụ pip, setuptools, wheel trong venv...")
     subprocess.run([str(python_venv), "-m", "pip", "install", "--upgrade", "pip", "setuptools", "wheel", "--quiet"])
-    print("[OK] Đã cập nhật pip.")
+    print("[OK] Đã cập nhật pip thành công.")
 
     # 3. Detect GPU & Install Torch
     print()
-    print("[*] [3/4] Đang cài đặt PyTorch phù hợp với phần cứng...")
+    print("[*] [BƯỚC 3/5] Kiểm tra phần cứng đồ họa (NVIDIA GPU / CUDA)...")
     has_nvidia = False
     if is_windows:
         try:
@@ -57,35 +73,58 @@ def main():
             has_nvidia = False
 
     if has_nvidia:
-        print("[!] Phát hiện NVIDIA GPU! Đang cài PyTorch CUDA 12.1 (Tăng tốc GPU)...")
+        print("[!] Phát hiện card đồ họa rời NVIDIA GPU!")
+        print("[*] Đang cài đặt PyTorch hỗ trợ tăng tốc CUDA 12.1 (GPU Acceleration)...")
         subprocess.run([str(pip_venv), "install", "torch", "torchvision", "torchaudio", "--index-url", "https://download.pytorch.org/whl/cu121"])
     elif is_macos:
-        print("[!] Phát hiện macOS (Apple Silicon / Intel). Đang cài PyTorch chuẩn Mac...")
+        print("[!] Phát hiện hệ điều hành macOS (Apple Silicon / Intel). Đang cài PyTorch...")
         subprocess.run([str(pip_venv), "install", "torch", "torchvision", "torchaudio"])
     else:
-        print("[!] Đang cài PyTorch phiên bản tiêu chuẩn CPU...")
+        print("[!] Không phát hiện NVIDIA GPU (hoặc đang dùng CPU / Intel / AMD).")
+        print("[*] Đang cài đặt PyTorch phiên bản tiêu chuẩn CPU...")
         subprocess.run([str(pip_venv), "install", "torch", "torchvision", "torchaudio"])
-    print("[OK] Đã cài đặt PyTorch.")
+    print("[OK] Đã hoàn thành cấu hình PyTorch.")
 
     # 4. Install requirements.txt
     print()
-    print("[*] [4/4] Đang cài đặt các thư viện AI từ requirements.txt...")
+    print("[*] [BƯỚC 4/5] Đang cài đặt các thư viện AI (Demucs, Whisper, FastAPI, yt-dlp, pysubs2)...")
     req_file = base_dir / "requirements.txt"
     if req_file.exists():
         subprocess.run([str(pip_venv), "install", "-r", str(req_file)])
     else:
         subprocess.run([str(pip_venv), "install", "demucs", "faster-whisper", "fastapi", "uvicorn", "yt-dlp", "pysubs2", "soundfile", "numpy"])
-    print("[OK] Đã cài đặt toàn bộ thư viện.")
+    print("[OK] Đã cài đặt đầy đủ tất cả thư viện AI.")
+
+    # 5. Check FFmpeg
+    print()
+    print("[*] [BƯỚC 5/5] Kiểm tra công cụ FFmpeg...")
+    ffmpeg_ok = False
+    try:
+        res = subprocess.run(["ffmpeg", "-version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        ffmpeg_ok = (res.returncode == 0)
+    except Exception:
+        ffmpeg_ok = False
+
+    if ffmpeg_ok:
+        print("[OK] FFmpeg đã có sẵn trên hệ thống.")
+    else:
+        print("-----------------------------------------------------------------------")
+        print("[CHÚ Ý] Máy tính chưa có công cụ FFmpeg trong biến môi trường PATH.")
+        print("        Tool cần FFmpeg để xuất video Karaoke MP4 và tách âm thanh.")
+        print("        Cách cài nhanh trên Windows (mở PowerShell và gõ):")
+        print("            winget install Gyan.FFmpeg")
+        print("        Hoặc tải giải nén từ: https://www.gyan.dev/ffmpeg/builds/")
+        print("-----------------------------------------------------------------------")
 
     print()
-    print("=" * 65)
+    print("=" * 68)
     print("   🎉 CHÚC MỪNG! ĐÃ CÀI ĐẶT MÔI TRƯỜNG VENV HOÀN TẤT (100%)")
-    print("=" * 65)
+    print("=" * 68)
     if is_windows:
-        print("Khởi động tool bằng file:  2_KHOI_DONG_TOOL.bat")
+        print("👉 Khởi động phòng thu bằng cách chạy file:  2_KHOI_DONG_TOOL.bat")
     else:
-        print("Khởi động tool bằng lệnh:  ./venv/bin/python server.py")
-    print("=" * 65)
+        print("👉 Khởi động phòng thu bằng lệnh:  ./venv/bin/python server.py")
+    print("=" * 68)
 
 if __name__ == "__main__":
     main()
