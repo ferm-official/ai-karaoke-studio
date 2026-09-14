@@ -499,7 +499,7 @@ export async function handleStartProcessing() {
     const isFileMode = modeFileBtn?.classList.contains("active");
     const lang = langSelect?.value || "vi";
     const whisperModel = whisperModelSelect?.value || "large-v3";
-    const demucsModel = demucsModelSelect?.value || "htdemucs_ft";
+    const demucsModel = demucsModelSelect?.value || "htdemucs";
     const customLyrics = document.getElementById("customLyricsInput")?.value.trim() || "";
     const useCache = document.getElementById("useCacheCheckbox")?.checked ?? true;
     const deviceMode = document.getElementById("hardwareModeInput")?.value || "gpu";

@@ -43,6 +43,10 @@ export async function fetchSystemInfo() {
             if (whisperModelSelect) {
                 whisperModelSelect.value = data.recommended_whisper || "tiny";
             }
+            const demucsModelSelect = document.getElementById("demucsModelSelect");
+            if (demucsModelSelect) {
+                demucsModelSelect.value = "htdemucs";
+            }
         }
 
         const envStatusText = document.getElementById("envStatusText");
