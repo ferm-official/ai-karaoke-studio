@@ -78,6 +78,16 @@ def render_karaoke_video(
     out_file = Path(output_video_path).resolve()
     out_file.parent.mkdir(parents=True, exist_ok=True)
 
+    # Check if target video file is currently open / locked by Windows Media Player or VLC
+    if out_file.exists():
+        try:
+            with open(out_file, "a+b") as lock_chk:
+                pass
+        except PermissionError:
+            raise PermissionError(
+                f"Tệp video '{out_file.name}' đang được mở bởi một chương trình khác (như Windows Media Player, VLC, Premiere...). Vui lòng tắt video đang xem rồi bấm Xuất Video lại!"
+            )
+
     escaped_ass = escape_ffmpeg_filter_path(str(ass_file))
 
     # Resolve background

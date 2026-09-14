@@ -127,9 +127,30 @@ def main():
             print("        Hoặc tải giải nén từ: https://www.gyan.dev/ffmpeg/builds/")
             print("-----------------------------------------------------------------------")
 
+    # 6. Verify core libraries installation
+    print()
+    print("[*] Kiểm tra hoạt động của các thư viện cốt lõi...")
+    verify_cmd = [
+        str(python_venv), "-c",
+        "import torch, demucs, faster_whisper, fastapi; print('ALL_CORE_LIBS_OK')"
+    ]
+    check_run = subprocess.run(verify_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    all_ok = "ALL_CORE_LIBS_OK" in (check_run.stdout or "")
+    if all_ok:
+        print("[OK] Toàn bộ thư viện AI cốt lõi đã sẵn sàng 100%!")
+    else:
+        print("-----------------------------------------------------------------------")
+        print("[CẢNH BÁO] Có một số thư viện chưa tải xong do đường truyền mạng.")
+        print("           Bạn vui lòng chạy lại file 1_CAI_DAT_MOI_TRUONG.bat để")
+        print("           hệ thống tự động tải tiếp các gói còn thiếu!")
+        print("-----------------------------------------------------------------------")
+
     print()
     print("=" * 68)
-    print("   🎉 CHÚC MỪNG! ĐÃ CÀI ĐẶT MÔI TRƯỜNG VENV HOÀN TẤT (100%)")
+    if all_ok:
+        print("   🎉 CHÚC MỪNG! ĐÃ CÀI ĐẶT MÔI TRƯỜNG VENV HOÀN TẤT (100%)")
+    else:
+        print("   ⚠️ HOÀN TẤT THIẾT LẬP VỚI MỘT SỐ CẢNH BÁO MẠNG")
     print("=" * 68)
     if is_windows:
         print("👉 Khởi động phòng thu bằng cách chạy file:  2_KHOI_DONG_TOOL.bat")

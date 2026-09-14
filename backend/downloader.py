@@ -126,7 +126,12 @@ def download_audio_from_url(url: str, output_dir: str, progress_callback = None)
             'socket_timeout': 30,
             'retries': 5,
             'fragment_retries': 5,
-            'progress_hooks': [yt_progress_hook]
+            'progress_hooks': [yt_progress_hook],
+            'match_filter': lambda info, *, incomplete: (
+                "Video quá dài (> 30 phút). Tool hỗ trợ tối đa 30 phút để bảo vệ bộ nhớ máy tính."
+                if (info.get("duration") and info.get("duration") > 1800)
+                else ("Luồng phát trực tiếp (Livestream). Vui lòng chọn bài hát hoàn chỉnh." if info.get("is_live") else None)
+            )
         }
 
         if strat.get('extractor_args'):
