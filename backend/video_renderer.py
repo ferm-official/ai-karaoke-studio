@@ -9,11 +9,13 @@ import torch
 logger = logging.getLogger(__name__)
 
 def escape_ffmpeg_filter_path(path_str: str) -> str:
-    """Escapes backslashes and colons for FFmpeg filter arguments on Windows."""
+    """Escapes backslashes, colons, and single quotes for FFmpeg filter arguments on Windows."""
     # Convert backslashes to forward slashes
     p = str(Path(path_str).resolve()).replace("\\", "/")
     # Escape colon (e.g., C:/ -> C\\:/)
     p = p.replace(":", "\\:")
+    # Escape single quote
+    p = p.replace("'", "'\\''")
     return p
 
 def create_default_background(output_image_path: str, width: int = 1920, height: int = 1080) -> str:
@@ -143,7 +145,18 @@ def render_karaoke_video(
     af_cpu_args = []
     if pitch_semitones != 0:
         pitch_ratio = 2.0 ** (pitch_semitones / 12.0)
-        af_args = ["-af", f"rubberband=pitch={pitch_ratio:.6f}"]
+        # Check if rubberband is supported in this FFmpeg build
+        has_rubberband = False
+        try:
+            chk = subprocess.run(["ffmpeg", "-filters"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=2)
+            has_rubberband = "rubberband" in (chk.stdout or "")
+        except Exception:
+            has_rubberband = False
+
+        if has_rubberband:
+            af_args = ["-af", f"rubberband=pitch={pitch_ratio:.6f}"]
+        else:
+            af_args = ["-af", f"asetrate=44100*{pitch_ratio:.6f},atempo={1.0/pitch_ratio:.6f}"]
         af_cpu_args = ["-af", f"asetrate=44100*{pitch_ratio:.6f},atempo={1.0/pitch_ratio:.6f}"]
 
     cmd = [
@@ -168,9 +181,9 @@ def render_karaoke_video(
 
     res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
     
-    # If hardware encoding fails, fallback to CPU libx264
-    if res.returncode != 0 and video_encoder != "libx264":
-        logger.warning(f"{gpu_label} encoding failed, falling back to CPU libx264...")
+    # If primary encoding or audio filter fails, attempt universal safe CPU libx264 fallback
+    if res.returncode != 0:
+        logger.warning(f"Primary video render with {gpu_label} failed ({res.stderr[:200]}). Falling back to safe CPU libx264...")
         cpu_tune = ["-tune", "stillimage"] if not is_video_bg else []
         cmd_cpu = [
             "ffmpeg", "-y",
@@ -192,8 +205,6 @@ def render_karaoke_video(
         res_cpu = subprocess.run(cmd_cpu, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
         if res_cpu.returncode != 0:
             raise RuntimeError(f"FFmpeg render error: {res_cpu.stderr}")
-    elif res.returncode != 0:
-        raise RuntimeError(f"FFmpeg render error: {res.stderr}")
 
     if progress_callback:
         progress_callback(100, "Xuất video Karaoke thành công!")

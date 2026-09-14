@@ -4,6 +4,7 @@ from typing import List, Dict, Any
 
 def format_ass_time(seconds: float) -> str:
     """Formats seconds into ASS timestamp: H:MM:SS.cs (centiseconds)."""
+    seconds = max(0.0, float(seconds or 0.0))
     h = int(seconds // 3600)
     m = int((seconds % 3600) // 60)
     s = int(seconds % 60)
@@ -14,6 +15,7 @@ def format_ass_time(seconds: float) -> str:
 
 def format_lrc_time(seconds: float) -> str:
     """Formats seconds into LRC timestamp: [mm:ss.xx]."""
+    seconds = max(0.0, float(seconds or 0.0))
     m = int(seconds // 60)
     s = int(seconds % 60)
     cs = int(round((seconds - int(seconds)) * 100))

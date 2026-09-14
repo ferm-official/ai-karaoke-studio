@@ -8,10 +8,13 @@ def parse_lrc_to_segments(lrc_text: str) -> List[Dict[str, Any]]:
     """Parses standard/enhanced LRC text into structured segments with word timestamps."""
     lines = lrc_text.strip().split("\n")
     lrc_entries = []
-    pattern = re.compile(r"\[(\d{2}):(\d{2})\.(\d{2,3})\](.*)")
+    pattern = re.compile(r"\[(\d{1,2}):(\d{2})[.:,](\d{2,3})\](.*)")
 
     for line in lines:
-        m = pattern.match(line.strip())
+        line_clean = line.strip()
+        if not line_clean:
+            continue
+        m = pattern.match(line_clean)
         if m:
             min_val = int(m.group(1))
             sec_val = int(m.group(2))
