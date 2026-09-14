@@ -70,15 +70,34 @@ def save_gemini_config(api_key: Optional[str] = None, model: Optional[str] = Non
 
 
 def _parse_srt_timestamp(ts: str) -> float:
-    """Converts 00:01:23,456 or 00:01:23.456 to seconds (float)."""
-    ts = ts.strip().replace(",", ".")
+    """
+    Converts various timestamp formats into seconds (float):
+    - 00:01:23,456 or 00:01:23.456 (HH:MM:SS,mmm)
+    - 00:09:282 (MM:SS:mmm - Gemini format)
+    - 01:23,456 or 01:23.456 (MM:SS,mmm)
+    - 00:00:09:282 (HH:MM:SS:mmm)
+    - 9.282 or 123.456 (seconds)
+    """
+    ts = ts.strip().split()[0].replace(",", ".")
+    # If ends with colon followed by 1 to 3 digits (e.g. 00:09:282 or 00:09:50)
+    # where the preceding part is seconds, change that colon to period
+    if re.search(r":\d{1,3}$", ts):
+        colon_idx = ts.rfind(":")
+        if ":" in ts[:colon_idx]:
+            ts = ts[:colon_idx] + "." + ts[colon_idx + 1:]
+
     parts = ts.split(":")
-    if len(parts) == 3:
+    if len(parts) == 4:
+        h, m, s, ms = parts
+        return float(h) * 3600 + float(m) * 60 + float(s) + float(ms) / 1000.0
+    elif len(parts) == 3:
         h, m, s = parts
         return float(h) * 3600 + float(m) * 60 + float(s)
     elif len(parts) == 2:
         m, s = parts
         return float(m) * 60 + float(s)
+    elif len(parts) == 1:
+        return float(parts[0])
     return 0.0
 
 
@@ -175,21 +194,49 @@ def distribute_words_in_timespan(words_raw: List[str], start_sec: float, end_sec
 def parse_srt_to_karaoke_segments(srt_content: str) -> List[Dict[str, Any]]:
     """
     Parses an SRT string into karaoke segments with calculated word-level timings.
-    Uses syllable-weighted interpolation and ensures concise line rules (<= 8 words).
+    Handles standard SRT, Gemini formats, inline timestamps, and robust line-by-line parsing.
     """
-    pattern = re.compile(
-        r'(\d+)\s*\n'
-        r'(\d{1,2}:\d{2}:\d{2}[,\.]\d{1,3})\s*-->\s*(\d{1,2}:\d{2}:\d{2}[,\.]\d{1,3})\s*\n'
-        r'(.*?)(?=\n\s*\n\d+|\Z)',
-        re.DOTALL
-    )
+    matches = []
+    lines = srt_content.replace("\r\n", "\n").split("\n")
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        if "-->" in line:
+            time_parts = line.split("-->")
+            start_str = time_parts[0].strip().split()[-1]
+            end_raw = time_parts[1].strip().split(None, 1)
+            end_str = end_raw[0].strip()
+            text_lines = []
+            if len(end_raw) > 1 and end_raw[1].strip():
+                text_lines.append(end_raw[1].strip())
+            
+            i += 1
+            while i < len(lines):
+                cur_l = lines[i].strip()
+                if not cur_l:
+                    break
+                if "-->" in cur_l:
+                    break
+                if cur_l.isdigit() and i + 1 < len(lines) and "-->" in lines[i+1]:
+                    break
+                text_lines.append(cur_l)
+                i += 1
+            
+            text_block = " ".join(text_lines)
+            matches.append(("", start_str, end_str, text_block))
+            continue
+        i += 1
 
-    matches = pattern.findall(srt_content)
     segments = []
 
     for idx, start_str, end_str, text_block in matches:
-        start_sec = _parse_srt_timestamp(start_str)
-        end_sec = _parse_srt_timestamp(end_str)
+        try:
+            start_sec = _parse_srt_timestamp(start_str)
+            end_sec = _parse_srt_timestamp(end_str)
+        except Exception as ex:
+            logger.warning(f"Could not parse timestamps '{start_str}' -> '{end_str}': {ex}")
+            continue
+
         cleaned_text = re.sub(r'<[^>]+>', '', text_block).strip()  # remove HTML tags
         cleaned_text = " ".join(cleaned_text.split())  # normalize whitespaces
 

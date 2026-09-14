@@ -44,6 +44,7 @@ BASE_DIR = Path(__file__).parent.resolve()
 STORAGE_DIR = BASE_DIR / "storage"
 PROJECTS_DIR = STORAGE_DIR / "projects"
 WEB_DIR = BASE_DIR / "web"
+TEST_DIR = BASE_DIR / "test"
 
 PROJECTS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -62,7 +63,7 @@ app.add_middleware(
 @app.middleware("http")
 async def add_no_cache_header(request, call_next):
     response = await call_next(request)
-    if request.url.path.startswith("/static") or request.url.path == "/":
+    if request.url.path.startswith("/static") or request.url.path == "/" or request.url.path.startswith("/test"):
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
@@ -70,6 +71,8 @@ async def add_no_cache_header(request, call_next):
 
 app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")
 app.mount("/storage", StaticFiles(directory=str(STORAGE_DIR)), name="storage")
+if TEST_DIR.exists():
+    app.mount("/test", StaticFiles(directory=str(TEST_DIR), html=True), name="test")
 
 
 def save_project_metadata(project_id: str, data: dict):
@@ -202,12 +205,8 @@ def run_pipeline_task(
         if transcription_engine != "gemini":
             effective_model = model_size
             if whisper_device == "cpu" and model_size in ["large-v3", "large"]:
-                if official_text_lines or parsed_synced_segments:
-                    logger.info(f"[{project_id}] CPU Mode with known lyrics -> Using 'tiny' (~3s) for ultra-fast boundary detection.")
-                    effective_model = "tiny"
-                else:
-                    logger.info(f"[{project_id}] CPU Mode without lyrics -> Using 'base' (~8s) for balanced speed and accuracy.")
-                    effective_model = "base"
+                logger.info(f"[{project_id}] CPU Mode -> Using 'base' (~6s) for balanced speed and boundary accuracy.")
+                effective_model = "base"
 
             update_progress(55, f"Đang nhận diện giọng hát thực tế trên {hw_label} bằng Faster-Whisper AI ({effective_model})...")
             transcription = transcribe_vocals(
