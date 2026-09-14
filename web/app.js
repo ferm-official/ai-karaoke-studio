@@ -1106,6 +1106,19 @@ function loadProjectData(projectData) {
     currentTimeLabel.textContent = "00:00";
     durationLabel.textContent = formatTime(projectData.duration || 0);
 
+    // Clear stage lines immediately so old song lyrics never linger
+    const c1 = kLine1?.querySelector(".line-content") || kLine1;
+    const c2 = kLine2?.querySelector(".line-content") || kLine2;
+    if (kLine1) kLine1.dataset.segIdx = "";
+    if (kLine2) kLine2.dataset.segIdx = "";
+    if (c1) c1.innerHTML = "";
+    if (c2) c2.innerHTML = "";
+
+    if (!projectData.segments || !projectData.segments.length) {
+        if (c1) c1.innerHTML = `<span class="line-placeholder">Chưa có lời bài hát (Bấm vào Chỉnh Sửa Lời để thêm)</span>`;
+        showToastNotification("Bài hát này chưa có lời! Bạn có thể vào tab 'Chỉnh Sửa Lời' để dán lời hoặc bấm 'Tìm Lời Online'.");
+    }
+
     // Initial Stage: display first couplet preview ready on screen
     updateKaraokeStage(0);
 }
@@ -3838,7 +3851,21 @@ function updateKaraokeStageCouplet(currentTime, segments) {
 
 function updateKaraokeStage(currentTime) {
     const segments = state.currentProject?.segments || [];
-    if (!segments.length) return;
+    if (!segments.length) {
+        if (kLine1) {
+            kLine1.dataset.segIdx = "";
+            const c1 = kLine1.querySelector(".line-content") || kLine1;
+            if (!c1.querySelector(".line-placeholder")) {
+                c1.innerHTML = `<span class="line-placeholder">Chưa có lời bài hát (Bấm vào Chỉnh Sửa Lời để thêm)</span>`;
+            }
+        }
+        if (kLine2) {
+            kLine2.dataset.segIdx = "";
+            const c2 = kLine2.querySelector(".line-content") || kLine2;
+            c2.innerHTML = "";
+        }
+        return;
+    }
 
     // 1. Lead-in Countdown Dots Check
     renderCountdownDots(currentTime, segments);

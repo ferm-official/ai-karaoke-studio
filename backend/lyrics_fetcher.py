@@ -32,13 +32,15 @@ def clean_song_title(raw_title: str) -> str:
 
     # Remove any brackets containing video, audio, or TikTok / live show noise
     bracket_noise = (
-        r"\[[^\]]*(official|music\s*video|\bmv\b|audio|lyric|video|visualizer|hq|hd|4k|320kbps|lossless|tiktok|trend|hot|sped\s*up|speed\s*up|remix|asia\s*\d+|pbn\s*\d+|paris\s*by\s*night|thúy\s*nga|thuý\s*nga|liveshow)[^\]]*\]|"
-        r"\([^)]*(official|music\s*video|\bmv\b|audio|lyric|video|visualizer|hq|hd|4k|320kbps|lossless|cover|live|tiktok|trend|hot|sped\s*up|speed\s*up|remix|slowed|nightcore|ringtone|chuông|asia\s*\d+|pbn\s*\d+|paris\s*by\s*night|thúy\s*nga|thuý\s*nga|liveshow)[^)]*\)"
+        r"\[[^\]]*(karaoke|beat|instrumental|remake|tone\s*nam|tone\s*nữ|acoustic|phối\s*khí|official|music\s*video|\bmv\b|audio|lyric|video|visualizer|hq|hd|4k|320kbps|lossless|tiktok|trend|hot|sped\s*up|speed\s*up|remix|asia\s*\d+|pbn\s*\d+|paris\s*by\s*night|thúy\s*nga|thuý\s*nga|liveshow)[^\]]*\]|"
+        r"\([^)]*(karaoke|beat|instrumental|remake|tone\s*nam|tone\s*nữ|acoustic|phối\s*khí|official|music\s*video|\bmv\b|audio|lyric|video|visualizer|hq|hd|4k|320kbps|lossless|cover|live|tiktok|trend|hot|sped\s*up|speed\s*up|remix|slowed|nightcore|ringtone|chuông|asia\s*\d+|pbn\s*\d+|paris\s*by\s*night|thúy\s*nga|thuý\s*nga|liveshow)[^)]*\)"
     )
     t = re.sub(bracket_noise, "", t, flags=re.I)
 
     # Remove standalone keywords
     for kw in [
+        r"\bkaraoke\b", r"\bbeat\b", r"\binstrumental\b", r"\bremake\b",
+        r"\btone\s*nam\b", r"\btone\s*nữ\b", r"\bacoustic\b", r"\bphối\s*khí\b",
         r"\bai\s+cover\b", r"\bcover\b", r"\b4k\b", r"\bhd\b", r"\bhq\b",
         r"official\s+music\s+video", r"official\s+mv", r"official\s+audio",
         r"lyric(s)?\s+video", r"live\s+at\s+[^\-]+", r"full\s+audio",
@@ -61,13 +63,13 @@ def clean_song_title(raw_title: str) -> str:
         parts = [p.strip() for p in t.split(" - ") if p.strip()]
         valid_parts = []
         for p in parts:
-            p_test = re.sub(r"^(ai\s+cover|cover|4k|hd|hq|audio|video|mv|official|lossless|remix)$", "", p, flags=re.I).strip()
+            p_test = re.sub(r"^(ai\s+cover|cover|4k|hd|hq|audio|video|mv|official|lossless|remix|karaoke|beat|instrumental|remake|\+)$", "", p, flags=re.I).strip()
             if p_test:
                 valid_parts.append(p)
         if valid_parts:
             t = " - ".join(valid_parts)
 
-    t = t.strip(" -_|#")
+    t = t.strip(" -_|#+")
     return t or raw_title.strip()
 
 
