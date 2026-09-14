@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 AI Karaoke Studio Pro — Automated Environment Setup Script
@@ -93,7 +93,7 @@ def main():
     if req_file.exists():
         subprocess.run([str(pip_venv), "install", "-r", str(req_file)])
     else:
-        subprocess.run([str(pip_venv), "install", "demucs", "faster-whisper", "fastapi", "uvicorn", "yt-dlp", "pysubs2", "soundfile", "numpy"])
+        subprocess.run([str(pip_venv), "install", "demucs", "faster-whisper", "fastapi>=0.115.0,<0.120.0", "uvicorn", "yt-dlp", "pysubs2", "soundfile", "numpy"])
     print("[OK] Đã cài đặt đầy đủ tất cả thư viện AI.")
 
     # 5. Check FFmpeg
