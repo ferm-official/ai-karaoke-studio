@@ -31,7 +31,7 @@ from backend.subtitle_gen import generate_ass_subtitles, generate_lrc, generate_
 from backend.video_renderer import render_karaoke_video
 from backend.lyrics_parser import parse_srt_to_segments, parse_lrc_to_segments
 from backend.downloader import download_audio_from_url
-from backend.lyrics_fetcher import clean_song_title, fetch_online_lyrics, detect_text_language, get_audio_file_duration
+from backend.lyrics_fetcher import clean_song_title, fetch_online_lyrics, detect_text_language, get_audio_file_duration, is_likely_vietnamese
 
 # Configure Logging
 logging.basicConfig(
@@ -487,23 +487,35 @@ async def upload_audio_file(
 
     song_title = Path(original_filename).stem
 
+    # Determine proper language: prioritize Vietnamese for Vietnamese titles/lyrics
+    if language == "auto" or not language:
+        if is_likely_vietnamese(song_title) or (custom_lyrics and is_likely_vietnamese(custom_lyrics)):
+            language = "vi"
+        else:
+            language = "vi"
+
     # Auto-fetch online lyrics if user didn't paste custom lyrics
     if not custom_lyrics or not custom_lyrics.strip():
         audio_dur = get_audio_file_duration(str(input_file_path))
         clean_q = clean_song_title(song_title)
         l_res = await asyncio.to_thread(fetch_online_lyrics, clean_q, target_duration=audio_dur)
         if l_res.get("status") == "found":
-            synced = l_res.get("synced_lyrics")
-            plain = l_res.get("plain_lyrics")
-            if synced and synced.strip() and not l_res.get("is_synced_truncated"):
-                custom_lyrics = synced.strip()
-            elif plain and plain.strip():
-                custom_lyrics = plain.strip()
+            cand_lang = l_res.get("language")
+            # If the song title is Vietnamese, NEVER accept an English or foreign match!
+            if is_likely_vietnamese(song_title) and cand_lang and cand_lang != "vi":
+                logger.warning(f"Rejected non-Vietnamese online lyrics ({cand_lang}) for Vietnamese title: '{song_title}'")
             else:
-                custom_lyrics = ""
-            logger.info(f"Auto-applied verified online lyrics for uploaded file '{clean_q}' (Duration: {audio_dur:.1f}s)")
-            if language == "auto" and l_res.get("language"):
-                language = l_res.get("language")
+                synced = l_res.get("synced_lyrics")
+                plain = l_res.get("plain_lyrics")
+                if synced and synced.strip() and not l_res.get("is_synced_truncated"):
+                    custom_lyrics = synced.strip()
+                elif plain and plain.strip():
+                    custom_lyrics = plain.strip()
+                else:
+                    custom_lyrics = ""
+                logger.info(f"Auto-applied verified online lyrics for uploaded file '{clean_q}' (Duration: {audio_dur:.1f}s)")
+                if cand_lang:
+                    language = cand_lang
 
     meta = {
         "id": project_id,
@@ -593,21 +605,32 @@ async def process_url(
 
             active_lyrics = custom_lyrics
             active_lang = language
+
+            if active_lang == "auto" or not active_lang:
+                if is_likely_vietnamese(title) or (active_lyrics and is_likely_vietnamese(active_lyrics)):
+                    active_lang = "vi"
+                else:
+                    active_lang = "vi"
+
             if not active_lyrics or not active_lyrics.strip():
                 clean_q = clean_song_title(title)
                 l_res = fetch_online_lyrics(clean_q, target_duration=track_dur)
                 if l_res.get("status") == "found":
-                    synced = l_res.get("synced_lyrics")
-                    plain = l_res.get("plain_lyrics")
-                    if synced and synced.strip() and not l_res.get("is_synced_truncated"):
-                        active_lyrics = synced.strip()
-                    elif plain and plain.strip():
-                        active_lyrics = plain.strip()
+                    cand_lang = l_res.get("language")
+                    if is_likely_vietnamese(title) and cand_lang and cand_lang != "vi":
+                        logger.warning(f"Rejected non-Vietnamese online lyrics ({cand_lang}) for Vietnamese title: '{title}'")
                     else:
-                        active_lyrics = ""
-                    logger.info(f"Auto-applied verified online lyrics for URL '{clean_q}' (Duration: {track_dur:.1f}s)")
-                    if active_lang == "auto" and l_res.get("language"):
-                        active_lang = l_res.get("language")
+                        synced = l_res.get("synced_lyrics")
+                        plain = l_res.get("plain_lyrics")
+                        if synced and synced.strip() and not l_res.get("is_synced_truncated"):
+                            active_lyrics = synced.strip()
+                        elif plain and plain.strip():
+                            active_lyrics = plain.strip()
+                        else:
+                            active_lyrics = ""
+                        logger.info(f"Auto-applied verified online lyrics for URL '{clean_q}' (Duration: {track_dur:.1f}s)")
+                        if cand_lang:
+                            active_lang = cand_lang
 
             update_progress(8, f"Đã tải xong '{title}'. Bắt đầu xử lý AI...")
             meta = {

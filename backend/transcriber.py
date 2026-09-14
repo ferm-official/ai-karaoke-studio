@@ -146,11 +146,12 @@ def transcribe_vocals(
 
     lang_param = language if language and language != "auto" else None
     
-    # NOTE: Never pass song lyrics as Whisper initial_prompt.
-    # Passing lyrics into initial_prompt causes Whisper's decoder cross-attention to hallucinate
-    # or skip intro vocals when preceded by long instrumental introductions (e.g. 15-30s intro).
-    # Pure acoustic transcription with VAD is 100% faithful to the sung vocals.
-    initial_prompt = None
+    # Prompt Whisper with a standard Vietnamese vocabulary prompt to strictly emit accented diacritics
+    # (prevents teen-code / unaccented transliteration like 'yau', 'fai', 'quen loi ve')
+    if lang_param == "vi" or lang_param is None:
+        initial_prompt = "Đây là bài hát tiếng Việt, ca từ chuẩn có dấu đầy đủ và đúng chính tả: "
+    else:
+        initial_prompt = None
 
     effective_audio_file = prepare_16k_mono_audio(vocal_file)
 

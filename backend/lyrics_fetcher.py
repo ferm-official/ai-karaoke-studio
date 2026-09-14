@@ -39,6 +39,7 @@ def clean_song_title(raw_title: str) -> str:
 
     # Remove standalone keywords
     for kw in [
+        r"\bai\s+cover\b", r"\bcover\b", r"\b4k\b", r"\bhd\b", r"\bhq\b",
         r"official\s+music\s+video", r"official\s+mv", r"official\s+audio",
         r"lyric(s)?\s+video", r"live\s+at\s+[^\-]+", r"full\s+audio",
         r"karaoke\s+beat", r"beat\s+chuẩn", r"beat\s+karaoke",
@@ -54,8 +55,43 @@ def clean_song_title(raw_title: str) -> str:
     t = re.sub(r"\(\s*\)|\[\s*\]", "", t)
     t = re.sub(r"\s+", " ", t).strip()
     t = re.sub(r"\s*-\s*-+\s*", " - ", t)
+
+    # Filter out pure noise segments separated by dashes, e.g. "Say một đời vì em - AI Cover - 4K"
+    if " - " in t:
+        parts = [p.strip() for p in t.split(" - ") if p.strip()]
+        valid_parts = []
+        for p in parts:
+            p_test = re.sub(r"^(ai\s+cover|cover|4k|hd|hq|audio|video|mv|official|lossless|remix)$", "", p, flags=re.I).strip()
+            if p_test:
+                valid_parts.append(p)
+        if valid_parts:
+            t = " - ".join(valid_parts)
+
     t = t.strip(" -_|#")
     return t or raw_title.strip()
+
+
+VIETNAMESE_DIACRITICS_RE = re.compile(
+    r"[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]",
+    re.IGNORECASE
+)
+
+COMMON_VIETNAMESE_WORDS = {
+    "anh", "em", "yeu", "thuong", "nho", "say", "doi", "vi", "khong", "nguoi",
+    "tinh", "ta", "mua", "dem", "ngay", "cho", "ve", "mot", "hai", "ba", "bon",
+    "nam", "chuyen", "qua", "co", "la", "de", "minh", "nhau", "nay", "duong", "loi"
+}
+
+def is_likely_vietnamese(text: str) -> bool:
+    """Checks if text contains Vietnamese diacritics or characteristic syllables."""
+    if not text:
+        return False
+    if VIETNAMESE_DIACRITICS_RE.search(text):
+        return True
+    cleaned_words = set(re.sub(r"[^\w\s]", "", text.lower()).split())
+    if len(cleaned_words.intersection(COMMON_VIETNAMESE_WORDS)) >= 2:
+        return True
+    return False
 
 
 def detect_text_language(text: str) -> str:
@@ -63,9 +99,7 @@ def detect_text_language(text: str) -> str:
     if not text:
         return "vi"
 
-    # Vietnamese special vowel diacritics
-    vi_pattern = re.compile(r"[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]", re.IGNORECASE)
-    if vi_pattern.search(text):
+    if is_likely_vietnamese(text):
         return "vi"
 
     # Chinese characters
@@ -138,6 +172,27 @@ def is_repetitive_loop_lyrics(synced_lyrics: str) -> bool:
     return False
 
 
+def titles_match_query(candidate_title: str, query_clean: str) -> bool:
+    """Ensures online lyrics candidate title actually relates to query title."""
+    if not candidate_title or not query_clean:
+        return False
+    c_norm = re.sub(r"[^\w\s]", "", candidate_title.lower()).strip()
+    q_norm = re.sub(r"[^\w\s]", "", query_clean.lower()).strip()
+    c_words = set(c_norm.split())
+    q_words = set(q_norm.split())
+    noise = {"cover", "ai", "4k", "hd", "hq", "audio", "video", "mv", "remix", "karaoke", "beat", "official"}
+    c_words -= noise
+    q_words -= noise
+    if not c_words or not q_words:
+        return False
+    # If any significant words match
+    overlap = c_words.intersection(q_words)
+    if len(overlap) >= 1 and (len(overlap) / len(q_words) >= 0.3 or len(overlap) / len(c_words) >= 0.3):
+        return True
+    from difflib import SequenceMatcher
+    return SequenceMatcher(None, c_norm, q_norm).ratio() >= 0.38
+
+
 def is_unwanted_karaoke_item(item: Dict[str, Any], query_clean: str, target_dur: float = 0.0) -> Tuple[bool, str]:
     """
     Identifies and rejects non-karaoke versions:
@@ -153,6 +208,10 @@ def is_unwanted_karaoke_item(item: Dict[str, Any], query_clean: str, target_dur:
     artist = (item.get("artistName") or "").lower()
     full_meta = f"{track} {album} {artist}"
     dur = float(item.get("duration") or 0.0)
+
+    # 0. Relevance check: Candidate track name MUST be related to user query!
+    if not titles_match_query(track, query_clean):
+        return True, f"Track title '{track}' does not match query title '{query_clean}'"
 
     # 1. Any TikTok / sped-up / short cut keywords
     for pat in TIKTOK_CLIP_PATTERNS:
@@ -319,8 +378,11 @@ def fetch_online_lyrics(query: str, artist: str = "", target_duration: float = 0
                             else:
                                 logger.info(f"Filtered out non-karaoke candidate '{it.get('trackName')} - {it.get('artistName')}' ({it.get('duration')}s): {reason}")
 
-                        # Use filtered candidates if any remain; otherwise fallback to all results with penalty scoring
-                        candidates_to_score = karaoke_candidates if karaoke_candidates else results
+                        if not karaoke_candidates:
+                            logger.info(f"No title-matched karaoke candidate for '{q}'")
+                            continue
+
+                        candidates_to_score = karaoke_candidates
 
                         sorted_results = sorted(
                             candidates_to_score,

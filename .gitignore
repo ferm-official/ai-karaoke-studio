@@ -17,6 +17,7 @@ storage/cache/*
 !storage/cache/.gitkeep
 test_file/*
 !test_file/.gitkeep
+test/
 
 # Audio & Video media files
 *.wav
