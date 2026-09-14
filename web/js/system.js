@@ -44,6 +44,17 @@ export async function fetchSystemInfo() {
                 whisperModelSelect.value = data.recommended_whisper || "tiny";
             }
         }
+
+        const envStatusText = document.getElementById("envStatusText");
+        if (envStatusText) {
+            if (data.is_in_venv) {
+                envStatusText.textContent = "Môi trường: venv";
+            } else if (data.venv_exists) {
+                envStatusText.textContent = "venv (Có sẵn)";
+            } else {
+                envStatusText.textContent = "Cài Môi Trường (venv)";
+            }
+        }
     } catch (e) {
         if (gpuStatusText) gpuStatusText.textContent = "100% Local Server Connected";
     }
@@ -169,6 +180,56 @@ export function initAppVersionAndUpdateSystem() {
             btnPerformUpdate.innerHTML = `🚀 Thử Cập Nhật Lại`;
         }
     });
+
+    const btnInstallEnvHeader = document.getElementById("btnInstallEnvHeader");
+    const btnInstallEnvModal = document.getElementById("btnInstallEnvModal");
+
+    async function handleInstallEnv() {
+        if (!confirm("Hệ thống sẽ chạy lệnh 'pip install -r requirements.txt' để cài đặt / cập nhật toàn bộ thư viện vào môi trường venv.\n\nBạn có muốn tiếp tục không?")) return;
+
+        openModal();
+        if (updateConsoleBox) updateConsoleBox.style.display = "block";
+        if (updateConsoleLog) updateConsoleLog.textContent = "[*] Đang cài đặt thư viện môi trường requirements.txt vào venv...\n[*] Quá trình này có thể mất 1 - 2 phút, vui lòng đợi...\n";
+
+        if (btnInstallEnvModal) {
+            btnInstallEnvModal.disabled = true;
+            btnInstallEnvModal.innerHTML = `⏳ Đang cài thư viện...`;
+        }
+        if (btnInstallEnvHeader) {
+            btnInstallEnvHeader.disabled = true;
+        }
+
+        try {
+            const res = await fetch("/api/install-env", { method: "POST" });
+            const data = await res.json();
+
+            if (updateConsoleLog) {
+                updateConsoleLog.textContent += (data.output || "") + "\n";
+                if (data.success) {
+                    updateConsoleLog.textContent += `\n[✔] ${data.message || "CÀI ĐẶT THƯ VIỆN HOÀN TẤT!"}`;
+                } else {
+                    updateConsoleLog.textContent += `\n[x] Lỗi: ${data.message || "Cài đặt thất bại"}`;
+                }
+            }
+
+            showToastNotification(data.message || (data.success ? "Cài đặt môi trường thành công!" : "Cài đặt môi trường thất bại"));
+            fetchSystemInfo();
+        } catch (err) {
+            if (updateConsoleLog) updateConsoleLog.textContent += `\n[x] Lỗi mạng: ${err.message}\n`;
+            showToastNotification("Lỗi kết nối khi cài đặt môi trường: " + err.message);
+        } finally {
+            if (btnInstallEnvModal) {
+                btnInstallEnvModal.disabled = false;
+                btnInstallEnvModal.innerHTML = `📦 Cài Môi Trường (pip)`;
+            }
+            if (btnInstallEnvHeader) {
+                btnInstallEnvHeader.disabled = false;
+            }
+        }
+    }
+
+    btnInstallEnvHeader?.addEventListener("click", handleInstallEnv);
+    btnInstallEnvModal?.addEventListener("click", handleInstallEnv);
 
     // Auto-check version & update after 2s on startup
     setTimeout(() => checkUpdate(false), 2000);

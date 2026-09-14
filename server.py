@@ -33,20 +33,26 @@ from backend.lyrics_parser import parse_srt_to_segments, parse_lrc_to_segments
 from backend.downloader import download_audio_from_url
 from backend.lyrics_fetcher import clean_song_title, fetch_online_lyrics, detect_text_language, get_audio_file_duration, is_likely_vietnamese
 
-# Configure Logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-)
-logger = logging.getLogger("KaraokeStudio")
-
 BASE_DIR = Path(__file__).parent.resolve()
 STORAGE_DIR = BASE_DIR / "storage"
 PROJECTS_DIR = STORAGE_DIR / "projects"
 WEB_DIR = BASE_DIR / "web"
-TEST_DIR = BASE_DIR / "test"
+LOGS_DIR = BASE_DIR / "logs"
 
 PROJECTS_DIR.mkdir(parents=True, exist_ok=True)
+LOGS_DIR.mkdir(parents=True, exist_ok=True)
+
+# Configure Logging (Console + File in logs/app.log)
+log_file = LOGS_DIR / "app.log"
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        logging.FileHandler(str(log_file), encoding="utf-8", mode="a")
+    ]
+)
+logger = logging.getLogger("KaraokeStudio")
 
 VERSION_FILE = BASE_DIR / "version.json"
 
@@ -419,7 +425,17 @@ def check_has_qsv() -> bool:
             return (res.returncode == 0)
         except Exception:
             return False
-    return False
+@app.get("/api/logs")
+async def get_latest_logs(lines: int = 100):
+    log_file = LOGS_DIR / "app.log"
+    if not log_file.exists():
+        return {"logs": "Chưa có file log."}
+    try:
+        with open(log_file, "r", encoding="utf-8", errors="ignore") as f:
+            all_lines = f.readlines()
+            return {"logs": "".join(all_lines[-lines:])}
+    except Exception as e:
+        return {"logs": f"Lỗi đọc log: {str(e)}"}
 
 
 @app.get("/api/system-info")
@@ -457,6 +473,10 @@ async def get_system_info():
     recommended_profile = "gpu_studio" if (has_cuda or (is_macos and has_mps)) else ("intel_qsv_fast" if has_qsv else "cpu_fast")
     recommended_whisper = "large-v3" if (has_cuda or (is_macos and has_mps)) else "tiny"
 
+    venv_py = Path("venv/Scripts/python.exe") if sys.platform == "win32" else Path("venv/bin/python")
+    venv_exists = venv_py.exists()
+    is_in_venv = (sys.prefix != sys.base_prefix) or ("venv" in sys.executable.lower())
+
     return {
         "cuda_available": gpu_available,
         "has_qsv": has_qsv,
@@ -465,7 +485,10 @@ async def get_system_info():
         "engine": engine_str,
         "os_platform": sys.platform,
         "recommended_profile": recommended_profile,
-        "recommended_whisper": recommended_whisper
+        "recommended_whisper": recommended_whisper,
+        "venv_exists": venv_exists,
+        "is_in_venv": is_in_venv,
+        "python_executable": sys.executable
     }
 
 
@@ -553,6 +576,52 @@ async def perform_update():
             "success": False,
             "version": get_app_version_info().get("version", "test 1.0.000"),
             "message": f"Lỗi thực thi cập nhật: {str(e)}",
+            "output": str(e)
+        }
+
+
+@app.post("/api/install-env")
+async def install_environment():
+    """
+    Cài đặt hoặc cập nhật toàn bộ thư viện môi trường requirements.txt
+    Ưu tiên chạy bằng venv nếu có, hoặc sys.executable.
+    """
+    venv_py = Path("venv/Scripts/python.exe") if sys.platform == "win32" else Path("venv/bin/python")
+    python_exec = str(venv_py) if venv_py.exists() else sys.executable
+    
+    try:
+        req_file = Path("requirements.txt")
+        if not req_file.exists():
+            return {"success": False, "message": "Không tìm thấy file requirements.txt", "output": ""}
+        
+        # Upgrade pip and install requirements
+        res = await asyncio.to_thread(
+            subprocess.run,
+            [python_exec, "-m", "pip", "install", "-r", "requirements.txt"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=300
+        )
+        output = (res.stdout or "") + "\n" + (res.stderr or "")
+        if res.returncode == 0:
+            return {
+                "success": True,
+                "message": "Đã cài đặt / cập nhật toàn bộ thư viện AI vào môi trường venv thành công!",
+                "python_executable": python_exec,
+                "output": output.strip()[-1500:]
+            }
+        else:
+            return {
+                "success": False,
+                "message": f"Quá trình cài đặt gặp lỗi (Mã lỗi {res.returncode})",
+                "python_executable": python_exec,
+                "output": output.strip()[-1500:]
+            }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Lỗi thực thi cài đặt: {str(e)}",
             "output": str(e)
         }
 

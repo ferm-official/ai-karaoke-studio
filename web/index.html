@@ -38,6 +38,12 @@
                 <span class="version-badge-notify" id="versionBadgeNotify" style="display: none;">CÓ BẢN MỚI</span>
             </button>
 
+            <!-- Environment / venv Setup Pill -->
+            <button type="button" class="system-version-pill system-env-pill" id="btnInstallEnvHeader" title="Môi trường Python & AI (venv) • Bấm để cài đặt hoặc cập nhật toàn bộ thư viện">
+                <span class="version-dot" style="background: #10B981; box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);"></span>
+                <span class="version-name" id="envStatusText">Cài Môi Trường (venv)</span>
+            </button>
+
             <!-- Nav Tabs -->
             <nav class="nav-tabs">
                 <button class="nav-tab active" data-tab="createTab">Tạo Bài Mới</button>
@@ -957,7 +963,8 @@
             <!-- Action Buttons -->
             <div class="update-modal-actions">
                 <button type="button" class="btn-secondary" id="btnCheckUpdateNow">Kiểm Tra Lại</button>
-                <button type="button" class="btn-primary btn-do-update" id="btnPerformUpdate">Cập Nhật Ngay (1-Click)</button>
+                <button type="button" class="btn-primary" id="btnInstallEnvModal" style="background: linear-gradient(135deg, #10B981, #059669); border-color: #10B981;">📦 Cài Môi Trường (pip)</button>
+                <button type="button" class="btn-primary btn-do-update" id="btnPerformUpdate">Cập Nhật Code (1-Click)</button>
                 <button type="button" class="btn-secondary" id="btnDismissUpdateModal">Đóng</button>
             </div>
         </div>
