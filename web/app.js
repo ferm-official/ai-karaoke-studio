@@ -16,8 +16,9 @@ const state = {
     uploadedBgFile: null,
     line1PosY: 0.65,
     line2PosY: 0.76,
-    fontSizeLine1: 52,
-    fontSizeLine2: 52,
+    fontSizeLine1: 54,
+    fontSizeLine2: 54,
+    fontName: "Tahoma, sans-serif",
     bgTheme: "nebula",
     colorActive: "#0018F5",
     colorInactive: "#ffffff",
@@ -1072,7 +1073,7 @@ function loadProjectData(projectData) {
 
     state.bgTheme = saved.bg_theme || "nebula";
 
-    const fontToApply = saved.font_name || projectData.font_name || "'Outfit', sans-serif";
+    const fontToApply = saved.font_name || projectData.font_name || "Tahoma, sans-serif";
     applyStageFont(fontToApply);
 
     const savedColor = saved.color_active_hex || "#0018F5";
@@ -1179,8 +1180,8 @@ async function deleteSegment(segIdx) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 segments: segments,
-                font_name: state.fontName || "Outfit",
-                font_size: state.fontSizeLine1 || 52
+                font_name: state.fontName || "Tahoma",
+                font_size: state.fontSizeLine1 || 54
             })
         });
         showToastNotification(`Đã xóa câu #${segIdx + 1} ("${removed.text || 'trống'}") khỏi bài hát!`);
@@ -1239,8 +1240,8 @@ async function updateSegmentText(segIdx, newText) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 segments: segments,
-                font_name: state.fontName || "Outfit",
-                font_size: state.fontSizeLine1 || 52
+                font_name: state.fontName || "Tahoma",
+                font_size: state.fontSizeLine1 || 54
             })
         });
         showToastNotification(`Đã lưu câu #${segIdx + 1}: "${trimmed}"`);
@@ -2769,7 +2770,7 @@ function measureKaraokeTextWidth(text, fontSize, fontFamily) {
     if (!_measureCanvas) _measureCanvas = document.createElement("canvas");
     const ctx = _measureCanvas.getContext("2d");
     if (!ctx) return text.length * fontSize * 0.62;
-    const cleanFont = (fontFamily || state.fontName || "Outfit").replace(/['"]/g, "").split(",")[0].trim();
+    const cleanFont = (fontFamily || state.fontName || "Tahoma").replace(/['"]/g, "").split(",")[0].trim();
     ctx.font = `800 ${fontSize}px ${cleanFont}, sans-serif`;
     return ctx.measureText(text).width;
 }
@@ -2802,7 +2803,7 @@ function getSongGlobalSafeFontSize() {
     const stageScreen = document.getElementById("stageScreen");
     const stageW = stageScreen?.clientWidth || 1200;
     const maxSafeW = Math.round(stageW * 0.82);
-    const font = (state.fontName || "Outfit").replace(/['"]/g, "").split(",")[0].trim();
+    const font = (state.fontName || "Tahoma").replace(/['"]/g, "").split(",")[0].trim();
 
     const testSize = 52;
     let minFit = 115;
@@ -3082,17 +3083,17 @@ function applyStyleTheme(themeKey, notify = true) {
 
     if (themeKey === "tronghieu") {
         document.getElementById("btnThemeTrongHieu")?.classList.add("active");
-        applyStageFont("Arial, sans-serif");
+        applyStageFont("Tahoma, sans-serif");
         applyLayoutPreset("staggered", false);
         applyStageActiveColor("#0018F5");
-        applyMasterFontSize(52);
+        applyMasterFontSize(54);
         state.wipingFxMode = "smooth";
         applyWipingFxMode();
         state.stageDisplayMode = "pingpong";
         state.showCountdownDots = true;
         const chk = document.getElementById("chkCountdownDots");
         if (chk) chk.checked = true;
-        if (notify) showToastNotification("Đã chọn Mẫu Trọng Hiếu KTV (Arial Bold, Xanh KTV, So Le)!");
+        if (notify) showToastNotification("Đã chọn Mẫu Chuẩn KTV Gia Huy Beat (Tahoma Bold, Xanh KTV, Viền Trắng, So Le)!");
     } else if (themeKey === "bolero") {
         document.getElementById("btnThemeBolero")?.classList.add("active");
         applyStageFont("'Pattaya', sans-serif");
@@ -3175,7 +3176,7 @@ async function saveProjectStageSettings() {
         align_line2: state.line2Align || "center",
         layout_preset: state.layoutPreset || "center",
         is_autofit: state.isAutoFitEnabled !== false,
-        font_name: stageFontSelect ? stageFontSelect.value : "Outfit",
+        font_name: stageFontSelect ? stageFontSelect.value : "Tahoma",
         primary_color: hexToAssColor(state.colorInactive || "#ffffff"),
         karaoke_color: hexToAssColor(state.colorActive || "#0018F5"),
         color_active_hex: state.colorActive || "#0018F5",
@@ -4821,8 +4822,8 @@ async function handleSaveLyrics() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 segments: updatedSegments,
-                font_name: "Arial",
-                font_size: 54,
+                font_name: state.fontName || "Tahoma",
+                font_size: state.fontSizeLine1 || 54,
                 primary_color: hexToAssColor(colorInactive.value),
                 karaoke_color: hexToAssColor(colorActive.value),
                 subtitle_pos_y: state.subtitlePosY || 0.75
@@ -5042,7 +5043,7 @@ function updateExportSummary() {
     const layoutEl = document.getElementById("exportSummaryLayout");
 
     if (fontEl) {
-        const fontName = state.fontName ? state.fontName.replace(/['"]/g, "").split(",")[0].trim() : "Outfit";
+        const fontName = state.fontName ? state.fontName.replace(/['"]/g, "").split(",")[0].trim() : "Tahoma";
         fontEl.textContent = fontName;
     }
     if (sizeEl) {
@@ -5087,7 +5088,7 @@ async function handleStartRender() {
 
     const projectId = state.currentProject.id;
     const resolution = videoResolutionSelect ? videoResolutionSelect.value : "1920x1080";
-    const fontName = state.fontName ? state.fontName.replace(/['"]/g, "").split(",")[0].trim() : "Outfit";
+    const fontName = state.fontName ? state.fontName.replace(/['"]/g, "").split(",")[0].trim() : "Tahoma";
     const fontSize = state.fontSizeLine1 || state.fontSizeLine2 || 54;
     const primColor = hexToAssColor(state.colorInactive || "#ffffff");
     const sungColor = hexToAssColor(state.colorActive || "#0018F5");

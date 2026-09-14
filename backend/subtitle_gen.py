@@ -36,7 +36,7 @@ def get_stroke_color_for_fill(fill_bgr: str) -> str:
 def generate_ass_subtitles(
     segments: List[Dict[str, Any]],
     output_ass_path: str,
-    font_name: str = "Arial",
+    font_name: str = "Tahoma",
     font_size: int = 54,
     primary_color: str = "&H00FFFFFF",     # Inactive unsung text (White in BGR)
     karaoke_color: str = "&H00F51800",     # Active sung text (Royal Blue #0018F5 in BGR)
@@ -65,7 +65,7 @@ def generate_ass_subtitles(
     if font_name:
         font_name = font_name.split(",")[0].strip().strip("'\"")
     if not font_name:
-        font_name = "Arial"
+        font_name = "Tahoma"
 
     # Calculate adaptive margins based on resolution, aspect ratio and custom vertical positions
     is_vertical = video_height > video_width

@@ -939,7 +939,7 @@ async def import_subtitles_endpoint(
     generate_ass_subtitles(
         segments,
         str(ass_path),
-        font_name=settings.get("font_name", "Outfit"),
+        font_name=settings.get("font_name", "Tahoma"),
         font_size=int(settings.get("font_size", 54)),
         primary_color=settings.get("primary_color", "&H00FFFFFF"),
         karaoke_color=settings.get("karaoke_color", "&H00F51800"),
@@ -994,7 +994,7 @@ async def update_lyrics(
 
     new_segments = payload.get("segments", [])
     settings = meta.get("settings", {})
-    font_name = payload.get("font_name") or settings.get("font_name", "Outfit")
+    font_name = payload.get("font_name") or settings.get("font_name", "Tahoma")
     font_size = int(payload.get("font_size") or settings.get("font_size", 54))
     primary_color = payload.get("primary_color") or settings.get("primary_color", "&H00FFFFFF")
     karaoke_color = payload.get("karaoke_color") or settings.get("karaoke_color", "&H00F51800")
@@ -1072,7 +1072,7 @@ async def split_long_segments_api(project_id: str, payload: Optional[Dict[str, A
     generate_ass_subtitles(
         split_segs,
         str(ass_path),
-        font_name=settings.get("font_name", "Outfit"),
+        font_name=settings.get("font_name", "Tahoma"),
         font_size=settings.get("font_size", 54),
         primary_color=settings.get("primary_color", "&H00FFFFFF"),
         karaoke_color=settings.get("karaoke_color", "&H00F51800"),
@@ -1148,7 +1148,7 @@ async def realign_project_api(project_id: str):
     generate_ass_subtitles(
         new_segments,
         str(ass_path),
-        font_name=settings.get("font_name", "Outfit"),
+        font_name=settings.get("font_name", "Tahoma"),
         font_size=int(settings.get("font_size", 54)),
         primary_color=settings.get("primary_color", "&H00FFFFFF"),
         karaoke_color=settings.get("karaoke_color", "&H00F51800"),
@@ -1271,7 +1271,7 @@ async def align_gemini_project_api(
     generate_ass_subtitles(
         new_segments,
         str(ass_path),
-        font_name=settings.get("font_name", "Outfit"),
+        font_name=settings.get("font_name", "Tahoma"),
         font_size=int(settings.get("font_size", 54)),
         primary_color=settings.get("primary_color", "&H00FFFFFF"),
         karaoke_color=settings.get("karaoke_color", "&H00F51800"),
@@ -1362,7 +1362,7 @@ async def save_project_settings(
         generate_ass_subtitles(
             segments=segments,
             output_ass_path=str(ass_path),
-            font_name=settings.get("font_name", "Outfit"),
+            font_name=settings.get("font_name", "Tahoma"),
             font_size=int(settings.get("font_size", 54)),
             primary_color=settings.get("primary_color", "&H00FFFFFF"),
             karaoke_color=settings.get("karaoke_color", "&H00F51800"),
@@ -1398,7 +1398,7 @@ async def render_video_endpoint(
     
     settings = meta.get("settings", {})
     segments = meta.get("segments", [])
-    font_name = payload.get("font_name") or settings.get("font_name", "Outfit")
+    font_name = payload.get("font_name") or settings.get("font_name", "Tahoma")
     font_size = int(payload.get("font_size") or settings.get("font_size", 54))
     primary_color = payload.get("primary_color") or settings.get("primary_color", "&H00FFFFFF")
     karaoke_color = payload.get("karaoke_color") or settings.get("karaoke_color", "&H00F51800")

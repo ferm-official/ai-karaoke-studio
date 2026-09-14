@@ -1184,11 +1184,11 @@ body {
 }
 
 .draggable-karaoke-line .line-content {
-    font-family: var(--font-heading);
+    font-family: 'Tahoma', var(--font-heading);
     font-size: 2.2rem;
-    font-weight: 800;
+    font-weight: 700;
     line-height: 1.2;
-    letter-spacing: 1px;
+    letter-spacing: 0.5px;
     text-shadow: 0 4px 16px rgba(0,0,0,0.8), 0 0 2px #000;
     white-space: nowrap !important;
     overflow: visible;
@@ -1266,7 +1266,7 @@ body {
     paint-order: stroke fill;
     text-shadow: 2px 3px 0px #000000, 0 2px 4px rgba(0, 0, 0, 0.95);
     user-select: none;
-    font-weight: 900;
+    font-weight: 700;
     letter-spacing: 0.5px;
     transition: opacity 0.15s ease;
 }
@@ -1295,9 +1295,9 @@ body {
     color: var(--stage-color-active, #0018F5);
     -webkit-text-stroke: var(--stage-stroke-active, 3px #ffffff);
     paint-order: stroke fill;
-    filter: var(--stage-shadow-active, drop-shadow(2px 3px 0px #000000));
+    filter: var(--stage-shadow-active, drop-shadow(1.5px 0 0 #000000) drop-shadow(-1.5px 0 0 #000000) drop-shadow(0 1.5px 0 #000000) drop-shadow(0 -1.5px 0 #000000) drop-shadow(2px 3px 0px #000000));
     user-select: none;
-    font-weight: 900;
+    font-weight: 700;
     letter-spacing: 0.5px;
     white-space: nowrap;
 }
@@ -1306,13 +1306,13 @@ body {
 .k-word-wrap.role-male .k-word-fill-inner {
     color: #0018F5 !important;
     -webkit-text-stroke: 3px #ffffff !important;
-    filter: drop-shadow(2px 3px 0px #000000) !important;
+    filter: drop-shadow(1.5px 0 0 #000000) drop-shadow(-1.5px 0 0 #000000) drop-shadow(0 1.5px 0 #000000) drop-shadow(0 -1.5px 0 #000000) drop-shadow(2px 3px 0px #000000) !important;
 }
 
 .k-word-wrap.role-female .k-word-fill-inner {
     color: #FF758C !important;
     -webkit-text-stroke: 3px #ffffff !important;
-    filter: drop-shadow(2px 3px 0px #000000) !important;
+    filter: drop-shadow(1.5px 0 0 #000000) drop-shadow(-1.5px 0 0 #000000) drop-shadow(0 1.5px 0 #000000) drop-shadow(0 -1.5px 0 #000000) drop-shadow(2px 3px 0px #000000) !important;
 }
 
 .k-word-wrap.role-duet .k-word-fill-inner {
