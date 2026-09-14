@@ -2219,6 +2219,7 @@ function initMasterQuickActions() {
         } else {
             const layout = document.getElementById("studio3ColLayout") || document.querySelector(".studio-3col-layout") || document.body;
             const isCinema = layout.classList.toggle("cinema-active");
+            document.body.classList.toggle("cinema-active-body", isCinema);
             btnCinemaMaster.classList.toggle("active", isCinema);
             const textSpan = btnCinemaMaster.querySelector("span");
             if (textSpan) {
@@ -2226,7 +2227,34 @@ function initMasterQuickActions() {
             } else {
                 btnCinemaMaster.textContent = isCinema ? "Thoát Rạp" : "Rạp Chiếu";
             }
-            showToastNotification(isCinema ? "Đã bật Chế độ Rạp Chiếu (Toàn cảnh)!" : "Đã trở về chế độ Studio");
+
+            // Browser Fullscreen API integration
+            if (isCinema) {
+                if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+                    document.documentElement.requestFullscreen().catch(() => {});
+                }
+            } else {
+                if (document.fullscreenElement && document.exitFullscreen) {
+                    document.exitFullscreen().catch(() => {});
+                }
+            }
+
+            showToastNotification(isCinema ? "Đã bật Chế độ Rạp Chiếu Toàn Màn Hình!" : "Đã trở về chế độ Studio");
+        }
+    });
+
+    document.addEventListener("fullscreenchange", () => {
+        if (!document.fullscreenElement) {
+            const layout = document.getElementById("studio3ColLayout");
+            if (layout && layout.classList.contains("cinema-active")) {
+                layout.classList.remove("cinema-active");
+                document.body.classList.remove("cinema-active-body");
+                if (btnCinemaMaster) {
+                    btnCinemaMaster.classList.remove("active");
+                    const textSpan = btnCinemaMaster.querySelector("span");
+                    if (textSpan) textSpan.textContent = "Rạp Chiếu (Toàn Màn Hình)";
+                }
+            }
         }
     });
 
