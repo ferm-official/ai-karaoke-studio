@@ -369,42 +369,41 @@ function setupNavigation() {
     });
 
     document.getElementById("btnGoToEditor")?.addEventListener("click", () => switchTab("editorTab"));
-    document.getElementById("btnGoToExport")?.addEventListener("click", () => switchTab("exportTab"));
-    document.getElementById("btnRedirectToStudioExport")?.addEventListener("click", () => switchTab("exportTab"));
+    document.getElementById("btnGoToExport")?.addEventListener("click", () => {
+        switchTab("playerTab");
+        executeStudioVideoExport();
+    });
+    document.getElementById("btnRedirectToStudioExport")?.addEventListener("click", () => {
+        switchTab("playerTab");
+        executeStudioVideoExport();
+    });
 }
 
 function scrollToStudioExport() {
-    if (typeof openInspectorPane === "function") {
-        openInspectorPane("paneExport");
-    }
-    setTimeout(() => {
-        const el = document.getElementById("stageInspectorContainer");
-        if (el) {
-            el.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
-    }, 100);
+    executeStudioVideoExport();
 }
 
-function syncGuidedStepper(activeTab, isExport = false) {
+function syncGuidedStepper(activeTab) {
     const step1 = document.getElementById("step1Indicator");
     const step2 = document.getElementById("step2Indicator");
-    const step3 = document.getElementById("step3Indicator");
-    if (!step1 || !step2 || !step3) return;
+    if (!step1 || !step2) return;
 
     step1.classList.remove("active");
     step2.classList.remove("active");
-    step3.classList.remove("active");
 
     if (activeTab === "createTab") {
         step1.classList.add("active");
-    } else if (isExport || activeTab === "exportTab") {
-        step3.classList.add("active");
     } else {
         step2.classList.add("active");
     }
 }
 
 function switchTab(targetId) {
+    // If anything requests exportTab, redirect smoothly to playerTab
+    if (targetId === "exportTab") {
+        targetId = "playerTab";
+    }
+
     navTabs.forEach(t => {
         t.classList.toggle("active", t.getAttribute("data-tab") === targetId);
     });
@@ -412,12 +411,9 @@ function switchTab(targetId) {
         p.classList.toggle("active", p.id === targetId);
     });
 
-    // Sync Guided Stepper Bar (1-2-3)
+    // Sync Guided Stepper Bar (1-2)
     syncGuidedStepper(targetId);
 
-    if (targetId === "exportTab") {
-        updateExportSummary();
-    }
     if (targetId === "libraryTab") {
         loadProjectsList();
     }
@@ -1229,16 +1225,36 @@ function loadProjectData(projectData) {
     }
 
 
+    const btnViewExportedVideo = document.getElementById("btnViewExportedVideo");
     if (projectData.video_url) {
-        renderedVideoPlayer.src = projectData.video_url;
-        renderedVideoPlayer.style.display = "block";
-        emptyVideoPlaceholder.style.display = "none";
-        dlVideoBtn.href = projectData.video_url;
-        dlVideoBtn.style.display = "flex";
+        if (renderedVideoPlayer) {
+            renderedVideoPlayer.src = projectData.video_url;
+            renderedVideoPlayer.style.display = "block";
+        }
+        if (emptyVideoPlaceholder) emptyVideoPlaceholder.style.display = "none";
+        if (dlVideoBtn) {
+            dlVideoBtn.href = projectData.video_url;
+            dlVideoBtn.style.display = "flex";
+        }
+        if (btnViewExportedVideo) btnViewExportedVideo.style.display = "block";
     } else {
-        renderedVideoPlayer.style.display = "none";
-        emptyVideoPlaceholder.style.display = "flex";
-        dlVideoBtn.style.display = "none";
+        if (renderedVideoPlayer) {
+            renderedVideoPlayer.style.display = "none";
+        }
+        if (emptyVideoPlaceholder) emptyVideoPlaceholder.style.display = "flex";
+        if (dlVideoBtn) dlVideoBtn.style.display = "none";
+        if (btnViewExportedVideo) btnViewExportedVideo.style.display = "none";
+    }
+
+    const btnOpenLocalFolder = document.getElementById("btnOpenLocalFolder");
+    if (btnOpenLocalFolder && projectData.id) {
+        btnOpenLocalFolder.onclick = async () => {
+            try {
+                await fetch(`/api/open-folder/${projectData.id}`, { method: "POST" });
+            } catch (err) {
+                console.error("Open folder failed:", err);
+            }
+        };
     }
 
     // Ensure segments conform to natural singable line lengths (concise, <= 7 words per line)
@@ -2524,31 +2540,196 @@ function initMasterQuickActions() {
         }
     });
 
-    // 5. 1-Click Direct "Xuất Video MP4 Full HD"
+    // 5. 1-Click Direct "Xuất Video MP4 Full HD" trực tiếp trong Phòng Thu
     const btnExportMaster = document.getElementById("btnExportMaster");
     btnExportMaster?.addEventListener("click", async () => {
-        if (!state.currentProject) {
-            showToastNotification("Chưa có bài hát nào được nạp để xuất video!");
-            return;
-        }
-        btnExportMaster.disabled = true;
-        const origText = btnExportMaster.textContent;
-        btnExportMaster.textContent = "Đang Chuẩn Bị Xuất...";
-        try {
-            // 1. Auto-save all stage settings first
-            await saveProjectStageSettings();
-            showToastNotification("Đang bắt đầu xuất video Full HD (GPU NVENC)...");
+        await executeStudioVideoExport();
+    });
 
-            // 2. Switch to Export tab and immediately trigger direct render!
-            switchTab("exportTab");
-            await handleStartRender();
-        } catch (err) {
-            console.error("Direct export error:", err);
-        } finally {
-            btnExportMaster.disabled = false;
-            btnExportMaster.textContent = origText;
+    const btnViewExportedVideo = document.getElementById("btnViewExportedVideo");
+    btnViewExportedVideo?.addEventListener("click", () => {
+        openStudioExportResultModal();
+    });
+
+    const btnCloseStudioExportModal = document.getElementById("btnCloseStudioExportModal");
+    btnCloseStudioExportModal?.addEventListener("click", () => {
+        closeStudioExportModal();
+    });
+
+    const studioExportModal = document.getElementById("studioExportModal");
+    studioExportModal?.addEventListener("click", (e) => {
+        if (e.target === studioExportModal) {
+            closeStudioExportModal();
         }
     });
+}
+
+/* ========================================================
+   DIRECT STUDIO MP4 EXPORT (GPU NVENC)
+   ======================================================== */
+async function executeStudioVideoExport() {
+    if (!state.currentProject) {
+        showToastNotification("Chưa có bài hát nào được nạp để xuất video!");
+        return;
+    }
+
+    const modal = document.getElementById("studioExportModal");
+    const progressBox = document.getElementById("studioExportProgressBox");
+    const resultBox = document.getElementById("studioExportResultBox");
+    const progressStatus = document.getElementById("exportProgressStatus");
+    const progressPercent = document.getElementById("exportProgressPercent");
+    const progressFill = document.getElementById("exportProgressFill");
+    const btnExportMaster = document.getElementById("btnExportMaster");
+
+    // 1. Tự động lưu cấu hình sân khấu hiện tại
+    try {
+        await saveProjectStageSettings();
+    } catch (e) {
+        console.warn("Auto-save before export warning:", e);
+    }
+
+    // 2. Mở Modal hiển thị trạng thái Render
+    if (modal) modal.style.display = "flex";
+    if (progressBox) progressBox.style.display = "block";
+    if (resultBox) resultBox.style.display = "none";
+    if (progressStatus) progressStatus.textContent = "Đang Render Video MP4 (GPU NVENC)...";
+    if (progressPercent) progressPercent.textContent = "Khởi chạy GPU và kết xuất đồ hoạ...";
+    if (progressFill) progressFill.style.width = "20%";
+
+    if (btnExportMaster) {
+        btnExportMaster.disabled = true;
+        btnExportMaster.textContent = "Đang Xuất MP4...";
+    }
+
+    let progressPct = 20;
+    const progressTimer = setInterval(() => {
+        if (progressPct < 85) {
+            progressPct += 3;
+            if (progressFill) progressFill.style.width = `${progressPct}%`;
+            if (progressPct > 45 && progressPercent) {
+                progressPercent.textContent = "Đang nén khung hình H.264 1080p bằng GPU NVENC...";
+            }
+        }
+    }, 450);
+
+    const projectId = state.currentProject.id;
+    const resolution = "1920x1080";
+    const fontName = state.fontName ? state.fontName.replace(/['"]/g, "").split(",")[0].trim() : "Tahoma";
+    const fontSize = state.fontSizeLine1 || state.fontSizeLine2 || 52;
+    const primColor = hexToAssColor(state.colorInactive || "#ffffff");
+    const sungColor = hexToAssColor(state.colorActive || "#0038FF");
+
+    try {
+        const res = await fetch(`/api/render-video/${projectId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                resolution: resolution,
+                font_name: fontName,
+                font_size: fontSize,
+                primary_color: primColor,
+                karaoke_color: sungColor,
+                pitch_semitones: state.currentPitchSemitones || 0,
+                line1_pos_x: state.line1PosX !== undefined ? state.line1PosX : 0.50,
+                line2_pos_x: state.line2PosX !== undefined ? state.line2PosX : 0.50,
+                line1_pos_y: state.line1PosY !== undefined ? state.line1PosY : 0.58,
+                line2_pos_y: state.line2PosY !== undefined ? state.line2PosY : 0.76,
+                font_size_line1: state.fontSizeLine1 || 52,
+                font_size_line2: state.fontSizeLine2 || 52,
+                align_line1: state.line1Align || "center",
+                align_line2: state.line2Align || "center",
+                layout_preset: state.layoutPreset || "center",
+                display_mode: state.stageDisplayMode || "pingpong"
+            })
+        });
+
+        clearInterval(progressTimer);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Lỗi xuất video");
+
+        // Cập nhật trạng thái video vào Project
+        state.currentProject.video_url = data.video_url;
+
+        // Chuyển Modal sang trạng thái Hoàn Tất & Xem Thử
+        if (progressFill) progressFill.style.width = "100%";
+        if (progressBox) progressBox.style.display = "none";
+        if (resultBox) resultBox.style.display = "block";
+
+        if (renderedVideoPlayer) {
+            renderedVideoPlayer.src = data.video_url;
+            renderedVideoPlayer.style.display = "block";
+            try { renderedVideoPlayer.play(); } catch (e) {}
+        }
+        if (dlVideoBtn) {
+            dlVideoBtn.href = data.download_url || data.video_url;
+            dlVideoBtn.style.display = "flex";
+        }
+
+        const btnOpenLocalFolder = document.getElementById("btnOpenLocalFolder");
+        if (btnOpenLocalFolder) {
+            btnOpenLocalFolder.onclick = async () => {
+                try {
+                    await fetch(`/api/open-folder/${projectId}`, { method: "POST" });
+                } catch (err) {
+                    console.error("Open folder failed:", err);
+                }
+            };
+        }
+
+        // Kích hoạt nút Xem lại video ở Card 5
+        const btnView = document.getElementById("btnViewExportedVideo");
+        if (btnView) btnView.style.display = "block";
+
+        showToastNotification("Xuất Video Karaoke MP4 Full HD thành công!");
+    } catch (err) {
+        clearInterval(progressTimer);
+        console.error("Studio render error:", err);
+        alert(`Lỗi xuất video: ${err.message}`);
+        if (modal) modal.style.display = "none";
+    } finally {
+        if (btnExportMaster) {
+            btnExportMaster.disabled = false;
+            btnExportMaster.textContent = "XUẤT VIDEO MP4 FULL HD";
+        }
+    }
+}
+
+function openStudioExportResultModal() {
+    if (!state.currentProject) return;
+    const modal = document.getElementById("studioExportModal");
+    const progressBox = document.getElementById("studioExportProgressBox");
+    const resultBox = document.getElementById("studioExportResultBox");
+
+    if (modal) modal.style.display = "flex";
+    if (progressBox) progressBox.style.display = "none";
+    if (resultBox) resultBox.style.display = "block";
+
+    if (state.currentProject.video_url && renderedVideoPlayer) {
+        if (!renderedVideoPlayer.src || !renderedVideoPlayer.src.includes(state.currentProject.video_url)) {
+            renderedVideoPlayer.src = state.currentProject.video_url;
+        }
+    }
+    if (dlVideoBtn && state.currentProject.video_url) {
+        dlVideoBtn.href = state.currentProject.video_url;
+    }
+    const btnOpenLocalFolder = document.getElementById("btnOpenLocalFolder");
+    if (btnOpenLocalFolder && state.currentProject.id) {
+        btnOpenLocalFolder.onclick = async () => {
+            try {
+                await fetch(`/api/open-folder/${state.currentProject.id}`, { method: "POST" });
+            } catch (err) {
+                console.error("Open folder failed:", err);
+            }
+        };
+    }
+}
+
+function closeStudioExportModal() {
+    const modal = document.getElementById("studioExportModal");
+    if (modal) modal.style.display = "none";
+    if (renderedVideoPlayer) {
+        try { renderedVideoPlayer.pause(); } catch (e) {}
+    }
 }
 
 /* ========================================================
@@ -2597,7 +2778,7 @@ function setupPlayer() {
 
     const btnGoToExport = document.getElementById("btnGoToExport");
     btnGoToExport?.addEventListener("click", () => {
-        switchTab("exportTab");
+        executeStudioVideoExport();
     });
 
     // Volume Mixer
@@ -5844,7 +6025,12 @@ async function openProjectInExport(projectId) {
         const data = await res.json();
         if (data.data) {
             loadProjectData(data.data);
-            switchTab("exportTab");
+            switchTab("playerTab");
+            if (data.data.video_url) {
+                openStudioExportResultModal();
+            } else {
+                executeStudioVideoExport();
+            }
         }
     } catch (e) {
         alert("Lỗi: " + e.message);

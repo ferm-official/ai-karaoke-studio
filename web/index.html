@@ -6,7 +6,7 @@
     <title>AI Karaoke Studio Pro — Local GPU Engine</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Anton&family=Baloo+2:wght@600;700;800&family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&family=Dancing+Script:wght@700&family=Lexend:wght@400;600;700;800&family=Lobster&family=Montserrat:wght@400;500;600;700;800;900&family=Noto+Serif:wght@600;700&family=Nunito:wght@400;600;700;800;900&family=Oswald:wght@600;700&family=Outfit:wght@300;400;500;600;700;800;900&family=Pattaya&family=Playfair+Display:wght@700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Roboto:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css?v=73.0">
+    <link rel="stylesheet" href="/static/style.css?v=74.0">
 </head>
 <body>
     <div class="app-background">
@@ -43,12 +43,11 @@
                 <button class="nav-tab active" data-tab="createTab">Tạo Bài Mới</button>
                 <button class="nav-tab" data-tab="playerTab" id="navPlayerTab">Phòng Thu Karaoke</button>
                 <button class="nav-tab" data-tab="editorTab" id="navEditorTab">Chỉnh Sửa Lời & Nhịp</button>
-                <button class="nav-tab" data-tab="exportTab" id="navExportTab">Xuất Video MP4</button>
                 <button class="nav-tab" data-tab="libraryTab" id="navLibraryTab">Thư Viện</button>
             </nav>
         </header>
 
-        <!-- Guided 3-Step Journey Bar for Beginners -->
+        <!-- Guided 2-Step Journey Bar -->
         <div class="guided-stepper-bar" id="guidedStepperBar">
             <div class="stepper-step active" data-tab="createTab" id="step1Indicator" title="Bước 1: Chọn bài hát hoặc nạp nhạc">
                 <span class="step-num">1</span>
@@ -58,19 +57,11 @@
                 </div>
             </div>
             <div class="stepper-arrow">→</div>
-            <div class="stepper-step" data-tab="playerTab" id="step2Indicator" title="Bước 2: Vào phòng thu hát live và thử beat">
+            <div class="stepper-step" data-tab="playerTab" id="step2Indicator" title="Bước 2: Vào phòng thu hát live, tinh chỉnh và xuất MP4 trực tiếp">
                 <span class="step-num">2</span>
                 <div class="step-info">
-                    <span class="step-title">Phòng Thu Hát Live</span>
-                    <span class="step-sub">Nghe beat, chỉnh tone, hát mic</span>
-                </div>
-            </div>
-            <div class="stepper-arrow">→</div>
-            <div class="stepper-step" data-tab="exportTab" id="step3Indicator" title="Bước 3: Xuất video MP4 tải về">
-                <span class="step-num">3</span>
-                <div class="step-info">
-                    <span class="step-title">Xuất Video MP4</span>
-                    <span class="step-sub">Tải video Full HD về máy</span>
+                    <span class="step-title">Phòng Thu & Xuất MP4</span>
+                    <span class="step-sub">Hát live, chỉnh style & xuất MP4</span>
                 </div>
             </div>
         </div>
@@ -630,6 +621,7 @@
                                 <button type="button" class="btn-cinema-mode" id="btnCinemaMaster" style="flex: 1; margin: 0; padding: 8px 10px; font-size: 0.82rem;">Rạp Chiếu</button>
                             </div>
                             <button type="button" class="btn-export-mp4" id="btnExportMaster" style="margin-top: 0; width: 100%;">XUẤT VIDEO MP4 FULL HD</button>
+                            <button type="button" class="btn-view-exported" id="btnViewExportedVideo" style="display: none; width: 100%; margin-top: 6px; background: transparent; border: none; font-size: 0.76rem; color: #38bdf8; text-decoration: underline dotted; cursor: pointer; text-align: center;">🎬 Xem & Tải video đã xuất</button>
                         </div>
                     </aside>
 
@@ -703,119 +695,7 @@
                 </div>
             </section>
 
-                        <!-- TAB 4: EXPORT VIDEO MP4 -->
-            <section class="tab-pane" id="exportTab">
-                <div class="export-grid studio-export-section" id="studioExportSection" style="max-width: 1200px; margin: 0 auto; padding: 20px 0;">
-                    <!-- Left: Export Video Action & Live Stage Summary -->
-                    <div class="card glass-card export-config-card">
-                        <h2 class="card-title">Cấu Hình Xuất Video MP4</h2>
-                        
-                        <div class="export-live-summary-card">
-                            <div class="summary-card-title">Cấu hình đồng bộ 100% từ phòng thu:</div>
-                            <div class="summary-badges-grid">
-                                <div class="summary-badge-item" title="Phông chữ hiển thị trên sân khấu">
-                                    <span class="badge-label">Phông chữ:</span>
-                                    <span class="badge-val" id="exportSummaryFont">Tahoma</span>
-                                </div>
-                                <div class="summary-badge-item" title="Cỡ chữ hiển thị trên sân khấu">
-                                    <span class="badge-label">Cỡ chữ:</span>
-                                    <span class="badge-val" id="exportSummarySize">52px</span>
-                                </div>
-                                <div class="summary-badge-item" title="Màu chữ khi hát qua">
-                                    <span class="badge-label">Màu chữ hát:</span>
-                                    <span class="badge-val" id="exportSummaryColor">
-                                        <span class="color-preview-dot" id="exportSummaryColorDot" style="background: #0038FF;"></span>
-                                        <span id="exportSummaryColorText">Xanh KTV Chuẩn</span>
-                                    </span>
-                                </div>
-                                <div class="summary-badge-item" title="Bố cục dòng chữ trên sân khấu">
-                                    <span class="badge-label">Bố cục:</span>
-                                    <span class="badge-val" id="exportSummaryLayout">So Le 16:9</span>
-                                </div>
-                                <div class="summary-badge-item" title="Tone cao độ bài hát">
-                                    <span class="badge-label">Tone nhạc:</span>
-                                    <span class="badge-val" id="exportSummaryTone" style="color: var(--cyan-accent, #00F2FE);">Gốc (0)</span>
-                                </div>
-                            </div>
-                            <div class="summary-hint">Cỡ chữ, phông chữ, màu sắc, vị trí và Tone nhạc được lấy trực tiếp từ phòng thu. Video xuất ra sẽ chuẩn xác 100%!</div>
-                        </div>
 
-                        <div class="form-group" style="margin-top: 18px;">
-                            <label class="input-label" for="videoResolutionSelect">Định dạng & Độ phân giải video</label>
-                            <select id="videoResolutionSelect" class="select-input">
-                                <option value="1920x1080" selected>1080p Ngang (1920x1080 - Chuẩn TV & YouTube)</option>
-                                <option value="1080x1920">1080p Dọc (1080x1920 - Chuẩn TikTok, Reels, Shorts)</option>
-                                <option value="1280x720">720p HD (1280x720 - Render nhanh)</option>
-                            </select>
-                        </div>
-
-                        <div class="render-action-wrap" style="margin-top: 24px;">
-                            <button class="btn-primary btn-glow btn-large" id="btnStartRender">
-                                <span>XUẤT VIDEO KARAOKE MP4 (GPU NVENC)</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Right: Download Assets & Preview -->
-                    <div class="card glass-card export-result-card">
-                        <h2 class="card-title">Tải Về & File Xuất</h2>
-                        
-                        <!-- Video Player Preview once rendered -->
-                        <div class="video-preview-box" id="videoPreviewBox">
-                            <div class="empty-video-placeholder" id="emptyVideoPlaceholder">
-                                <span>Video xuất sẽ hiển thị tại đây</span>
-                            </div>
-                            <video id="renderedVideoPlayer" controls style="display: none;" class="rendered-video"></video>
-                        </div>
-
-                        <!-- Direct File Downloads -->
-                        <div class="download-links-list">
-                            <a href="#" class="download-item-btn dl-video-highlight" id="dlVideoBtn" style="display: none;" download>
-                                <div class="dl-info">
-                                    <span class="dl-title">Tải Video Karaoke MP4 (Về máy)</span>
-                                    <span class="dl-meta">1080p • H.264 • Tải về thư mục Downloads</span>
-                                </div>
-                            </a>
-                            <button class="download-item-btn" id="btnOpenLocalFolder" style="display: none; background: rgba(0, 242, 254, 0.12); border-color: var(--cyan-accent); width: 100%; text-align: left;">
-                                <div class="dl-info">
-                                    <span class="dl-title" style="color: var(--cyan-accent); font-weight: 700;">Mở Thư Mục Chứa File Trên Máy</span>
-                                    <span class="dl-meta">Mở trực tiếp thư mục lưu trữ trên Windows Explorer</span>
-                                </div>
-                            </button>
-                            <a href="#" class="download-item-btn" id="dlInstrumentalBtn" download>
-                                <div class="dl-info">
-                                    <span class="dl-title">Nhạc Beat (Instrumental MP3)</span>
-                                    <span class="dl-meta">320kbps • Đã tách vocal</span>
-                                </div>
-                            </a>
-                            <a href="#" class="download-item-btn" id="dlVocalBtn" download>
-                                <div class="dl-info">
-                                    <span class="dl-title">Giọng Ca Sĩ (Vocal MP3)</span>
-                                    <span class="dl-meta">256kbps • Giọng hát riêng biệt</span>
-                                </div>
-                            </a>
-                            <a href="#" class="download-item-btn" id="dlSrtSubBtn" download>
-                                <div class="dl-info">
-                                    <span class="dl-title">Phụ Đề Chuẩn SRT (.SRT)</span>
-                                    <span class="dl-meta">Tương thích CapCut, Premiere, DaVinci, SubRip Player</span>
-                                </div>
-                            </a>
-                            <a href="#" class="download-item-btn" id="dlAssSubBtn" download>
-                                <div class="dl-info">
-                                    <span class="dl-title">Phụ Đề Karaoke (.ASS)</span>
-                                    <span class="dl-meta">Chứa hiệu ứng đổi màu chuẩn Aegisub/Premiere</span>
-                                </div>
-                            </a>
-                            <a href="#" class="download-item-btn" id="dlLrcSubBtn" download>
-                                <div class="dl-info">
-                                    <span class="dl-title">File Lời Canh Nhịp (.LRC)</span>
-                                    <span class="dl-meta">Tương thích các phần mềm máy nghe nhạc, Spotify, KTV</span>
-                                </div>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </section>
 
             <!-- TAB 5: RECENT PROJECTS LIBRARY -->
             <section class="tab-pane" id="libraryTab">
@@ -831,6 +711,72 @@
                 </div>
             </section>
         </main>
+    </div>
+
+    <!-- MODAL XUẤT VIDEO MP4 TRỰC TIẾP TẠI PHÒNG THU -->
+    <div class="modal-overlay" id="studioExportModal" style="display: none; z-index: 10000;">
+        <div class="modal-card glass-card studio-export-dialog">
+            <div class="export-modal-header">
+                <h3 class="modal-title" id="studioExportTitle">Xuất Video Karaoke MP4 Full HD</h3>
+                <button type="button" class="btn-close-modal" id="btnCloseStudioExportModal" title="Đóng">&times;</button>
+            </div>
+            
+            <!-- Trạng thái 1: Đang render video -->
+            <div id="studioExportProgressBox" style="display: none; text-align: center; padding: 24px 12px;">
+                <div class="modal-spinner" style="margin: 0 auto 16px;">
+                    <div class="spinner-ring" style="width: 54px; height: 54px; border-width: 4px;"></div>
+                </div>
+                <h4 style="font-size: 1.15rem; color: #00F2FE; margin-bottom: 8px;" id="exportProgressStatus">Đang Render Video MP4 (GPU NVENC)...</h4>
+                <p style="font-size: 0.82rem; color: #94a3b8; margin-bottom: 18px; line-height: 1.4;">
+                    Toàn bộ cỡ chữ, font, màu quét và bố cục 2 dòng đang được áp dụng chuẩn xác 100% vào video 1080p.
+                </p>
+                <div class="progress-bar-wrap" style="height: 8px; margin: 0 auto 12px; max-width: 420px; background: rgba(255,255,255,0.08); border-radius: 99px; overflow: hidden;">
+                    <div class="progress-fill" id="exportProgressFill" style="width: 55%; height: 100%; background: linear-gradient(90deg, #00F2FE, #a855f7);"></div>
+                </div>
+                <span id="exportProgressPercent" style="font-size: 0.8rem; color: #38bdf8; font-weight: 600;">Đang xử lý nén khung hình...</span>
+            </div>
+
+            <!-- Trạng thái 2: Xuất hoàn tất, xem trước & tải về -->
+            <div id="studioExportResultBox" style="display: none;">
+                <div class="export-success-banner" style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    <div>
+                        <div style="color: #6ee7b7; font-weight: 700; font-size: 0.95rem;">Xuất Video MP4 Full HD Thành Công!</div>
+                        <div style="color: #a7f3d0; font-size: 0.75rem;">Độ phân giải 1080p • Chuẩn H.264 • Tương thích mọi TV, Điện thoại & YouTube</div>
+                    </div>
+                </div>
+
+                <!-- Trình phát video xem thử trực tiếp -->
+                <div class="export-video-preview" style="position: relative; border-radius: 8px; overflow: hidden; background: #000; margin-bottom: 16px; aspect-ratio: 16/9; max-height: 270px; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.1);">
+                    <div class="empty-video-placeholder" id="emptyVideoPlaceholder" style="display: none;"></div>
+                    <video id="renderedVideoPlayer" controls playsinline style="width: 100%; height: 100%; object-fit: contain;"></video>
+                </div>
+
+                <!-- Cụm nút hành động chính -->
+                <div class="export-download-actions" style="display: flex; flex-direction: column; gap: 10px;">
+                    <a href="#" class="btn-primary btn-large" id="dlVideoBtn" style="text-decoration: none; justify-content: center; font-size: 0.95rem; font-weight: 800; padding: 12px 16px;" download>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="margin-right: 8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        TẢI VIDEO KARAOKE MP4 (VỀ MÁY)
+                    </a>
+                    <button type="button" class="btn-secondary" id="btnOpenLocalFolder" style="justify-content: center; font-weight: 700; padding: 10px 14px; background: rgba(0, 242, 254, 0.1); border-color: var(--cyan-accent); color: var(--cyan-accent); cursor: pointer;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                        Mở Thư Mục Chứa File Trên Máy (Windows Explorer)
+                    </button>
+                </div>
+
+                <!-- Tải thêm Beat, Vocal và Phụ Đề -->
+                <details style="margin-top: 14px; background: rgba(255,255,255,0.03); border-radius: 8px; padding: 8px 12px; border: 1px solid rgba(255,255,255,0.08);">
+                    <summary style="font-size: 0.8rem; color: #94a3b8; cursor: pointer; user-select: none; font-weight: 600;">Tải Thêm Beat MP3, Vocal, Phụ Đề ASS / LRC / SRT</summary>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px;">
+                        <a href="#" id="dlInstrumentalBtn" class="btn-secondary btn-sm" style="text-decoration: none; justify-content: center; font-size: 0.76rem;" download>Nhạc Beat MP3</a>
+                        <a href="#" id="dlVocalBtn" class="btn-secondary btn-sm" style="text-decoration: none; justify-content: center; font-size: 0.76rem;" download>Giọng Ca Sĩ MP3</a>
+                        <a href="#" id="dlAssSubBtn" class="btn-secondary btn-sm" style="text-decoration: none; justify-content: center; font-size: 0.76rem;" download>Phụ Đề KTV (.ASS)</a>
+                        <a href="#" id="dlLrcSubBtn" class="btn-secondary btn-sm" style="text-decoration: none; justify-content: center; font-size: 0.76rem;" download>File Canh Nhịp (.LRC)</a>
+                        <a href="#" id="dlSrtSubBtn" class="btn-secondary btn-sm" style="text-decoration: none; justify-content: center; font-size: 0.76rem; grid-column: span 2;" download>Phụ Đề Chuẩn (.SRT)</a>
+                    </div>
+                </details>
+            </div>
+        </div>
     </div>
 
     <!-- PROCESSING OVERLAY MODAL -->
@@ -986,7 +932,7 @@
         </div>
     </div>
 
-    <script src="/static/app.js?v=73.0"></script>
+    <script src="/static/app.js?v=74.0"></script>
 </body>
 </html>
 
