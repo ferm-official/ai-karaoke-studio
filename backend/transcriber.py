@@ -146,60 +146,24 @@ def transcribe_vocals(
 
     lang_param = language if language and language != "auto" else None
     
-    # Prompt Whisper with a standard Vietnamese vocabulary prompt to strictly emit accented diacritics
-    # (prevents teen-code / unaccented transliteration like 'yau', 'fai', 'quen loi ve')
-    if lang_param == "vi" or lang_param is None:
-        initial_prompt = "Đây là bài hát tiếng Việt, ca từ chuẩn có dấu đầy đủ và đúng chính tả: "
-    else:
-        initial_prompt = None
+    # Use custom_prompt if provided; avoid hardcoded prompt that triggers YouTube spam hallucination
+    initial_prompt = custom_prompt.strip() if (custom_prompt and custom_prompt.strip()) else None
 
     effective_audio_file = prepare_16k_mono_audio(vocal_file)
 
     beam_size = 1 if device == "cpu" else 5
-    batch_size = 8 if device == "cpu" else 16
 
-    try:
-        if device == "cpu":
-            segments_generator, info = model.transcribe(
-                str(effective_audio_file),
-                word_timestamps=True,
-                language=lang_param,
-                vad_filter=False,
-                no_speech_threshold=0.88,
-                log_prob_threshold=-1.5,
-                initial_prompt=initial_prompt,
-                beam_size=beam_size,
-                temperature=0.0,
-                condition_on_previous_text=False
-            )
-        else:
-            batched_pipeline = get_whisper_batched_pipeline(model)
-            segments_generator, info = batched_pipeline.transcribe(
-                str(effective_audio_file),
-                batch_size=batch_size,
-                word_timestamps=True,
-                language=lang_param,
-                vad_filter=False,
-                no_speech_threshold=0.88,
-                log_prob_threshold=-1.5,
-                initial_prompt=initial_prompt,
-                beam_size=beam_size,
-                temperature=0.0
-            )
-    except Exception as e:
-        logger.warning(f"Whisper inference fallback ({e}), using sequential model.transcribe...")
-        segments_generator, info = model.transcribe(
-            str(effective_audio_file),
-            word_timestamps=True,
-            language=lang_param,
-            vad_filter=False,
-            no_speech_threshold=0.88,
-            log_prob_threshold=-1.5,
-            initial_prompt=initial_prompt,
-            beam_size=beam_size,
-            temperature=0.0,
-            condition_on_previous_text=False
-        )
+    # Direct high-speed sequential transcription with context continuation enabled
+    segments_generator, info = model.transcribe(
+        str(effective_audio_file),
+        word_timestamps=True,
+        language=lang_param,
+        vad_filter=False,
+        initial_prompt=initial_prompt,
+        beam_size=beam_size,
+        temperature=0.0,
+        condition_on_previous_text=True
+    )
 
     detected_lang = info.language
     detected_lang_prob = info.language_probability
