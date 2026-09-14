@@ -6,7 +6,7 @@
     <title>AI Karaoke Studio Pro — Local GPU Engine</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Anton&family=Baloo+2:wght@600;700;800&family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&family=Dancing+Script:wght@700&family=Lexend:wght@400;600;700;800&family=Lobster&family=Montserrat:wght@400;500;600;700;800;900&family=Noto+Serif:wght@600;700&family=Nunito:wght@400;600;700;800;900&family=Oswald:wght@600;700&family=Outfit:wght@300;400;500;600;700;800;900&family=Pattaya&family=Playfair+Display:wght@700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Roboto:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css?v=74.0">
+    <link rel="stylesheet" href="/static/style.css?v=75.0">
 </head>
 <body>
     <div class="app-background">
@@ -516,14 +516,45 @@
                             </div>
                         </div>
 
-                        <!-- Card 2: Bố Cục & Chống Tràn Viền -->
+                        <!-- Card 2: Bố Cục & Vị Trí 2 Dòng -->
                         <div class="c-card">
-                            <div class="c-card-title"><span>Bố Cục 2 Dòng</span></div>
+                            <div class="c-card-title">
+                                <span>Bố Cục & Vị Trí 2 Dòng</span>
+                                <button type="button" class="btn-card-reset" id="btnResetLinePos" title="Khôi phục vị trí mặc định chuẩn KTV (58% & 76%)">Đặt lại chuẩn</button>
+                            </div>
                             <div class="layout-toggle-row">
                                 <button type="button" class="btn-layout-pill active" id="btnPresetStaggered">So Le (Chuẩn)</button>
                                 <button type="button" class="btn-layout-pill" id="btnPresetCenter">Căn Giữa</button>
                             </div>
-                            <div class="switches-list">
+
+                            <!-- Tùy Chỉnh Độ Cao / Vị Trí Dòng 1 & Dòng 2 -->
+                            <div class="line-pos-controls">
+                                <div class="fader-group" style="margin-top: 10px;">
+                                    <div class="fader-head">
+                                        <span class="fader-name">Vị Trí Dòng 1 (Dòng Trên):</span>
+                                        <div style="display: flex; align-items: center; gap: 6px;">
+                                            <button type="button" class="btn-step-seek" id="btnY1Minus" style="padding: 2px 7px; font-size: 0.72rem; line-height: 1; border-radius: 4px;" title="Đẩy dòng trên lên cao">-</button>
+                                            <span class="fader-val" id="stagePosY1Text" style="min-width: 34px; text-align: center; cursor: pointer; text-decoration: underline dotted;" title="Bấm để nhập vị trí tùy ý (25 - 80%)">58%</span>
+                                            <button type="button" class="btn-step-seek" id="btnY1Plus" style="padding: 2px 7px; font-size: 0.72rem; line-height: 1; border-radius: 4px;" title="Hạ dòng trên xuống thấp">+</button>
+                                        </div>
+                                    </div>
+                                    <input type="range" class="c-slider" id="stagePosY1Slider" min="25" max="80" value="58" step="1">
+                                </div>
+
+                                <div class="fader-group" style="margin-top: 8px;">
+                                    <div class="fader-head">
+                                        <span class="fader-name" style="color: #38bdf8; font-weight: 700;">Vị Trí Dòng 2 (Dòng Dưới):</span>
+                                        <div style="display: flex; align-items: center; gap: 6px;">
+                                            <button type="button" class="btn-step-seek" id="btnY2Minus" style="padding: 2px 7px; font-size: 0.72rem; line-height: 1; border-radius: 4px;" title="Đẩy dòng dưới lên cao">-</button>
+                                            <span class="fader-val" id="stagePosY2Text" style="min-width: 34px; text-align: center; color: #38bdf8; font-weight: 700; cursor: pointer; text-decoration: underline dotted;" title="Bấm để nhập vị trí tùy ý (45 - 95%)">76%</span>
+                                            <button type="button" class="btn-step-seek" id="btnY2Plus" style="padding: 2px 7px; font-size: 0.72rem; line-height: 1; border-radius: 4px;" title="Hạ dòng dưới xuống thấp">+</button>
+                                        </div>
+                                    </div>
+                                    <input type="range" class="c-slider" id="stagePosY2Slider" min="45" max="95" value="76" step="1">
+                                </div>
+                            </div>
+
+                            <div class="switches-list" style="margin-top: 10px;">
                                 <label class="studio-switch-row" title="Tự động thu nhỏ chữ với câu dài để không bị tràn viền 16:9">
                                     <span class="switch-title">Tự Động Co Chữ (Auto-Fit)</span>
                                     <span class="studio-switch-wrap">
@@ -932,7 +963,7 @@
         </div>
     </div>
 
-    <script src="/static/app.js?v=74.0"></script>
+    <script src="/static/app.js?v=75.0"></script>
 </body>
 </html>
 

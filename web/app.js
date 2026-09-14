@@ -1284,6 +1284,11 @@ function loadProjectData(projectData) {
         applyLayoutPreset("staggered", false);
     }
 
+    const savedY1 = (saved.line1_pos_y !== undefined) ? parseFloat(saved.line1_pos_y) : 0.58;
+    const savedY2 = (saved.line2_pos_y !== undefined) ? parseFloat(saved.line2_pos_y) : 0.76;
+    applyLinePositionY(1, savedY1);
+    applyLinePositionY(2, savedY2);
+
     const savedSize = saved.font_size_line1 || saved.font_size_line2 || projectData.font_size_line1 || projectData.font_size_line2 || 52;
     applyMasterFontSize(savedSize);
 
@@ -3192,22 +3197,23 @@ function applyLinePositionY(lineNum, posYFraction) {
     const lineEl = document.getElementById(lineNum === 1 ? "kLine1" : "kLine2");
     if (!stageScreen || !lineEl) return;
 
-    const clamped = Math.max(0.08, Math.min(0.92, parseFloat(posYFraction)));
+    const clamped = Math.max(0.15, Math.min(0.95, parseFloat(posYFraction)));
     if (lineNum === 1) state.line1PosY = clamped;
     else state.line2PosY = clamped;
 
-    const stageH = stageScreen.clientHeight || 480;
-    const lineH = lineEl.clientHeight || 50;
-    const maxTop = stageH - lineH - 10;
-    const targetTop = Math.max(10, Math.min(maxTop, stageH * clamped));
-
-    lineEl.style.top = `${targetTop}px`;
+    const pctY = Math.round(clamped * 100);
+    lineEl.style.top = `${pctY}%`;
 
     const textEl = document.getElementById(lineNum === 1 ? "stagePosY1Text" : "stagePosY2Text");
     const sliderEl = document.getElementById(lineNum === 1 ? "stagePosY1Slider" : "stagePosY2Slider");
-    const pctY = Math.round(clamped * 100);
     if (textEl) textEl.textContent = `${pctY}%`;
     if (sliderEl) sliderEl.value = pctY;
+
+    // Hiển thị chữ mẫu xem trước nếu dòng hiện đang trống để người dùng thấy ngay vị trí khi kéo chỉnh
+    const contentEl = lineEl.querySelector(".line-content") || lineEl;
+    if (contentEl && (!contentEl.textContent || !contentEl.textContent.trim())) {
+        contentEl.innerHTML = `<span class="line-placeholder">${lineNum === 1 ? "AI Karaoke Studio Pro" : "Nhấn Phát để bắt đầu hát"}</span>`;
+    }
 
     // Update Floating HUD Badge position label
     const hudPosEl = document.getElementById(lineNum === 1 ? "kLine1HudPos" : "kLine2HudPos");
@@ -3957,6 +3963,71 @@ function setupDraggableSubtitle() {
     // Nút Tự Động Cắt Dòng Trực Tiếp Trong Studio (Card 2)
     document.getElementById("btnAutoSplitInStudio")?.addEventListener("click", () => {
         autoSplitProjectSegments(5, 24);
+    });
+
+    // Điều Chỉnh Vị Trí Dòng 1 (Trên) & Dòng 2 (Dưới) Trong Card 2
+    const stagePosY1Slider = document.getElementById("stagePosY1Slider");
+    stagePosY1Slider?.addEventListener("input", (e) => {
+        const val = parseInt(e.target.value);
+        applyLinePositionY(1, val / 100);
+    });
+
+    const stagePosY2Slider = document.getElementById("stagePosY2Slider");
+    stagePosY2Slider?.addEventListener("input", (e) => {
+        const val = parseInt(e.target.value);
+        applyLinePositionY(2, val / 100);
+    });
+
+    document.getElementById("btnY1Minus")?.addEventListener("click", () => {
+        const cur = parseInt(stagePosY1Slider?.value || (state.line1PosY ? Math.round(state.line1PosY * 100) : 58));
+        const next = Math.max(25, cur - 1);
+        applyLinePositionY(1, next / 100);
+    });
+
+    document.getElementById("btnY1Plus")?.addEventListener("click", () => {
+        const cur = parseInt(stagePosY1Slider?.value || (state.line1PosY ? Math.round(state.line1PosY * 100) : 58));
+        const next = Math.min(80, cur + 1);
+        applyLinePositionY(1, next / 100);
+    });
+
+    document.getElementById("btnY2Minus")?.addEventListener("click", () => {
+        const cur = parseInt(stagePosY2Slider?.value || (state.line2PosY ? Math.round(state.line2PosY * 100) : 76));
+        const next = Math.max(45, cur - 1);
+        applyLinePositionY(2, next / 100);
+    });
+
+    document.getElementById("btnY2Plus")?.addEventListener("click", () => {
+        const cur = parseInt(stagePosY2Slider?.value || (state.line2PosY ? Math.round(state.line2PosY * 100) : 76));
+        const next = Math.min(95, cur + 1);
+        applyLinePositionY(2, next / 100);
+    });
+
+    document.getElementById("btnResetLinePos")?.addEventListener("click", () => {
+        applyLinePositionY(1, 0.58);
+        applyLinePositionY(2, 0.76);
+        showToastNotification("Đã đặt lại vị trí 2 dòng về chuẩn KTV (58% & 76%)");
+    });
+
+    document.getElementById("stagePosY1Text")?.addEventListener("click", () => {
+        const cur = parseInt(stagePosY1Slider?.value || 58);
+        const input = prompt("Nhập vị trí Dòng Trên (Y %) [25 - 80]:", cur);
+        if (input !== null) {
+            const parsed = parseInt(input);
+            if (!isNaN(parsed)) {
+                applyLinePositionY(1, Math.max(25, Math.min(80, parsed)) / 100);
+            }
+        }
+    });
+
+    document.getElementById("stagePosY2Text")?.addEventListener("click", () => {
+        const cur = parseInt(stagePosY2Slider?.value || 76);
+        const input = prompt("Nhập vị trí Dòng Dưới (Y %) [45 - 95]:", cur);
+        if (input !== null) {
+            const parsed = parseInt(input);
+            if (!isNaN(parsed)) {
+                applyLinePositionY(2, Math.max(45, Math.min(95, parsed)) / 100);
+            }
+        }
     });
 
     // Floating HUD Quick Zoom Buttons
