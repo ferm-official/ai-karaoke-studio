@@ -39,7 +39,7 @@ def generate_ass_subtitles(
     font_name: str = "Tahoma",
     font_size: int = 54,
     primary_color: str = "&H00FFFFFF",     # Inactive unsung text (White in BGR)
-    karaoke_color: str = "&H00F51800",     # Active sung text (Royal Blue #0018F5 in BGR)
+    karaoke_color: str = "&H00FF3800",     # Active sung text (Royal Blue #0038FF in BGR)
     outline_color: str = "&H00000000",     # Outline (Solid Black)
     shadow_color: str = "&H80000000",      # Shadow (Black)
     video_width: int = 1920,
@@ -76,7 +76,7 @@ def generate_ass_subtitles(
     fs2 = int(round((font_size_line2 or font_size) * (1.0 if not is_vertical else scale_factor)))
 
     margin_lr = int(video_width * (0.06 if is_vertical else 0.05))
-    outline_val = round(3.5 * scale_factor, 1)
+    outline_val = round(4.0 * scale_factor, 1)
     shadow_val = round(3.0 * scale_factor, 1)
 
     # 2D X position margin calculation
@@ -122,7 +122,7 @@ def generate_ass_subtitles(
         margin_l2 = margin_lr
 
     # Colors for Duet roles (ASS uses &HAABBGGRR format)
-    color_male = "&H00F51800"     # Royal Blue #0018F5 (Chuẩn KTV)
+    color_male = "&H00FF3800"     # Royal Blue #0038FF (Chuẩn KTV)
     color_female = "&H008C75FF"   # Pink #FF758C
     color_duet = "&H0059E2FF"     # Gold #FFE259
     cd_fs = max(24, int(fs1 * 0.55))

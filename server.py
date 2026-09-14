@@ -941,7 +941,7 @@ async def import_subtitles_endpoint(
         font_name=settings.get("font_name", "Tahoma"),
         font_size=int(settings.get("font_size", 54)),
         primary_color=settings.get("primary_color", "&H00FFFFFF"),
-        karaoke_color=settings.get("karaoke_color", "&H00F51800"),
+        karaoke_color=settings.get("karaoke_color", "&H00FF3800"),
         line1_pos_y=settings.get("line1_pos_y"),
         line2_pos_y=settings.get("line2_pos_y"),
         line1_pos_x=settings.get("line1_pos_x"),
@@ -996,7 +996,7 @@ async def update_lyrics(
     font_name = payload.get("font_name") or settings.get("font_name", "Tahoma")
     font_size = int(payload.get("font_size") or settings.get("font_size", 54))
     primary_color = payload.get("primary_color") or settings.get("primary_color", "&H00FFFFFF")
-    karaoke_color = payload.get("karaoke_color") or settings.get("karaoke_color", "&H00F51800")
+    karaoke_color = payload.get("karaoke_color") or settings.get("karaoke_color", "&H00FF3800")
 
     meta["segments"] = new_segments
     
@@ -1074,7 +1074,7 @@ async def split_long_segments_api(project_id: str, payload: Optional[Dict[str, A
         font_name=settings.get("font_name", "Tahoma"),
         font_size=settings.get("font_size", 54),
         primary_color=settings.get("primary_color", "&H00FFFFFF"),
-        karaoke_color=settings.get("karaoke_color", "&H00F51800"),
+        karaoke_color=settings.get("karaoke_color", "&H00FF3800"),
         line1_pos_y=settings.get("line1_pos_y"),
         line2_pos_y=settings.get("line2_pos_y"),
         line1_pos_x=settings.get("line1_pos_x"),
@@ -1150,7 +1150,7 @@ async def realign_project_api(project_id: str):
         font_name=settings.get("font_name", "Tahoma"),
         font_size=int(settings.get("font_size", 54)),
         primary_color=settings.get("primary_color", "&H00FFFFFF"),
-        karaoke_color=settings.get("karaoke_color", "&H00F51800"),
+        karaoke_color=settings.get("karaoke_color", "&H00FF3800"),
         line1_pos_y=settings.get("line1_pos_y"),
         line2_pos_y=settings.get("line2_pos_y"),
         line1_pos_x=settings.get("line1_pos_x"),
@@ -1273,7 +1273,7 @@ async def align_gemini_project_api(
         font_name=settings.get("font_name", "Tahoma"),
         font_size=int(settings.get("font_size", 54)),
         primary_color=settings.get("primary_color", "&H00FFFFFF"),
-        karaoke_color=settings.get("karaoke_color", "&H00F51800"),
+        karaoke_color=settings.get("karaoke_color", "&H00FF3800"),
         line1_pos_y=settings.get("line1_pos_y"),
         line2_pos_y=settings.get("line2_pos_y"),
         line1_pos_x=settings.get("line1_pos_x"),
@@ -1364,7 +1364,7 @@ async def save_project_settings(
             font_name=settings.get("font_name", "Tahoma"),
             font_size=int(settings.get("font_size", 54)),
             primary_color=settings.get("primary_color", "&H00FFFFFF"),
-            karaoke_color=settings.get("karaoke_color", "&H00F51800"),
+            karaoke_color=settings.get("karaoke_color", "&H00FF3800"),
             line1_pos_y=settings.get("line1_pos_y"),
             line2_pos_y=settings.get("line2_pos_y"),
             line1_pos_x=settings.get("line1_pos_x"),
@@ -1400,7 +1400,7 @@ async def render_video_endpoint(
     font_name = payload.get("font_name") or settings.get("font_name", "Tahoma")
     font_size = int(payload.get("font_size") or settings.get("font_size", 54))
     primary_color = payload.get("primary_color") or settings.get("primary_color", "&H00FFFFFF")
-    karaoke_color = payload.get("karaoke_color") or settings.get("karaoke_color", "&H00F51800")
+    karaoke_color = payload.get("karaoke_color") or settings.get("karaoke_color", "&H00FF3800")
     pitch_semitones = int(payload.get("pitch_semitones") if payload.get("pitch_semitones") is not None else settings.get("pitch_semitones", 0))
     
     subtitle_pos_y = payload.get("subtitle_pos_y") or meta.get("subtitle_pos_y")

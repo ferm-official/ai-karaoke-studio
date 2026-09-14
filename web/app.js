@@ -20,7 +20,7 @@ const state = {
     fontSizeLine2: 54,
     fontName: "Tahoma, sans-serif",
     bgTheme: "nebula",
-    colorActive: "#0018F5",
+    colorActive: "#0038FF",
     colorInactive: "#ffffff",
     currentPitchSemitones: 0,
     wipingFxMode: "smooth",
@@ -1076,7 +1076,7 @@ function loadProjectData(projectData) {
     const fontToApply = saved.font_name || projectData.font_name || "Tahoma, sans-serif";
     applyStageFont(fontToApply);
 
-    const savedColor = saved.color_active_hex || "#0018F5";
+    const savedColor = saved.color_active_hex || "#0038FF";
     applyStageActiveColor(savedColor);
 
     state.wipingFxMode = saved.wiping_fx || "smooth";
@@ -2050,8 +2050,8 @@ function initStudioInspector() {
     // Preset color buttons in paneColors
     document.getElementById("btnColorPresetTrongHieu")?.addEventListener("click", () => {
         if (typeof applyStageActiveColor === "function") {
-            applyStageActiveColor("#0018F5");
-            showToastNotification("Đã chọn màu: Xanh Chuẩn KTV Trọng Hiếu (#0018F5)!");
+            applyStageActiveColor("#0038FF");
+            showToastNotification("Đã chọn màu: Xanh Chuẩn KTV Gia Huy Beat (#0038FF)!");
         }
     });
     document.getElementById("btnColorPresetGold")?.addEventListener("click", () => {
@@ -2552,6 +2552,10 @@ function applyStageFont(fontFamily) {
     state._cachedSongSafeSize = null;
     state._cachedSongSafeSizeSegsRef = null;
 
+    document.documentElement.style.setProperty("--karaoke-font", fontFamily);
+    const stageScreen = document.getElementById("stageScreen") || document.getElementById("karaokeScreen");
+    if (stageScreen) stageScreen.style.setProperty("--karaoke-font", fontFamily);
+
     const kLine1 = document.getElementById("kLine1");
     const kLine2 = document.getElementById("kLine2");
     const kLine1Content = document.getElementById("kLine1Content");
@@ -2562,7 +2566,7 @@ function applyStageFont(fontFamily) {
     if (kLine1Content) kLine1Content.style.fontFamily = fontFamily;
     if (kLine2Content) kLine2Content.style.fontFamily = fontFamily;
 
-    document.querySelectorAll(".draggable-karaoke-line, .draggable-karaoke-line .line-content, .k-word, .k-word-wrap, .k-word-base, .k-word-fill-inner, .line-placeholder").forEach(el => {
+    document.querySelectorAll(".draggable-karaoke-line, .draggable-karaoke-line .line-content, .text-layer-base, .text-layer-active, .k-word-unit, .k-word, .k-word-wrap, .k-word-base, .k-word-fill-inner, .line-placeholder").forEach(el => {
         el.style.fontFamily = fontFamily;
     });
 
@@ -3085,7 +3089,7 @@ function applyStyleTheme(themeKey, notify = true) {
         document.getElementById("btnThemeTrongHieu")?.classList.add("active");
         applyStageFont("Tahoma, sans-serif");
         applyLayoutPreset("staggered", false);
-        applyStageActiveColor("#0018F5");
+        applyStageActiveColor("#0038FF");
         applyMasterFontSize(54);
         state.wipingFxMode = "smooth";
         applyWipingFxMode();
@@ -3178,8 +3182,8 @@ async function saveProjectStageSettings() {
         is_autofit: state.isAutoFitEnabled !== false,
         font_name: stageFontSelect ? stageFontSelect.value : "Tahoma",
         primary_color: hexToAssColor(state.colorInactive || "#ffffff"),
-        karaoke_color: hexToAssColor(state.colorActive || "#0018F5"),
-        color_active_hex: state.colorActive || "#0018F5",
+        karaoke_color: hexToAssColor(state.colorActive || "#0038FF"),
+        color_active_hex: state.colorActive || "#0038FF",
         color_inactive_hex: state.colorInactive || "#ffffff",
         bg_theme: state.bgTheme || "nebula",
         pitch_semitones: state.currentPitchSemitones || 0,
@@ -3954,56 +3958,76 @@ function renderKaraokeLine(container, segment, currentTime) {
     const roleClass = role !== "all" ? `role-${role}` : "";
 
     // 1. Rebuild DOM ONLY when the segment changes or content is empty
-    if (container.dataset.segIdx !== segId || !contentEl.firstElementChild) {
+    if (container.dataset.segIdx !== segId || !contentEl.querySelector(".text-layer-active")) {
         container.dataset.segIdx = segId;
-        let html = "";
-        words.forEach((w, wIdx) => {
-            html += `<span class="k-word-wrap ${roleClass}" data-widx="${wIdx}">` +
-                    `<span class="k-word-base">${w.word}</span>` +
-                    `<span class="k-word-fill"><span class="k-word-fill-inner">${w.word}</span></span>` +
-                    `</span> `;
-        });
-        contentEl.innerHTML = html;
+        const wordsHtml = words.map((w, wIdx) => `<span class="k-word-unit" data-widx="${wIdx}">${w.word}</span>`).join(" ");
+        contentEl.innerHTML = `
+            <div class="karaoke-text-container">
+                <div class="text-layer-base">${wordsHtml}</div>
+                <div class="text-layer-active ${roleClass}">${wordsHtml}</div>
+            </div>
+        `;
 
         if (state.fontName) {
-            contentEl.querySelectorAll(".k-word-base, .k-word-fill-inner").forEach(el => {
+            contentEl.querySelectorAll(".text-layer-base, .text-layer-active").forEach(el => {
                 el.style.fontFamily = state.fontName;
             });
         }
 
-        const baseFontSize = (state.fontSizeLine1 || state.fontSizeLine2 || 52);
+        const baseFontSize = (state.fontSizeLine1 || state.fontSizeLine2 || 54);
         const uniformFs = (state.isAutoFitEnabled !== false) ? Math.min(baseFontSize, getSongGlobalSafeFontSize()) : baseFontSize;
         contentEl.style.fontSize = `${uniformFs}px`;
     }
 
-    // 2. High-performance 60 FPS Progressive Wipe (Update fill width without reflow)
-    const fillEls = contentEl.querySelectorAll(".k-word-fill");
-    words.forEach((w, wIdx) => {
-        const fillEl = fillEls[wIdx];
-        if (!fillEl) return;
-        const wrapEl = fillEl.parentElement;
-        let pct = 0;
-        if (currentTime >= w.end) {
-            pct = 100;
-            if (wrapEl && wrapEl.classList.contains("wiping")) {
-                wrapEl.classList.remove("wiping");
-                wrapEl.classList.add("sung");
-            }
-        } else if (currentTime > w.start) {
-            const dur = Math.max(0.04, w.end - w.start);
-            pct = Math.min(100, Math.max(0, ((currentTime - w.start) / dur) * 100));
-            if (wrapEl && !wrapEl.classList.contains("wiping")) {
-                wrapEl.classList.add("wiping");
-                wrapEl.classList.remove("sung");
-            }
-        } else {
-            pct = 0;
-            if (wrapEl && (wrapEl.classList.contains("wiping") || wrapEl.classList.contains("sung"))) {
-                wrapEl.classList.remove("wiping", "sung");
+    // 2. High-performance 60 FPS Continuous Progressive Wipe (Adobe Premiere / Sayatoo / KTV style)
+    const baseLayer = contentEl.querySelector(".text-layer-base");
+    const activeLayer = contentEl.querySelector(".text-layer-active");
+    if (!baseLayer || !activeLayer) return;
+
+    let revealPct = 0;
+    const firstWord = words[0];
+    const lastWord = words[words.length - 1];
+
+    if (currentTime >= lastWord.end) {
+        revealPct = 100;
+    } else if (currentTime <= firstWord.start) {
+        revealPct = 0;
+    } else {
+        const baseSpans = baseLayer.querySelectorAll(".k-word-unit");
+        const totalLineWidth = baseLayer.offsetWidth;
+
+        if (totalLineWidth > 0) {
+            for (let i = 0; i < words.length; i++) {
+                const w = words[i];
+                const span = baseSpans[i];
+                if (currentTime >= w.end) {
+                    if (i === words.length - 1) {
+                        revealPct = 100;
+                        break;
+                    }
+                    continue;
+                }
+                if (currentTime >= w.start && currentTime < w.end) {
+                    const dur = Math.max(0.04, w.end - w.start);
+                    const prog = Math.max(0, Math.min(1, (currentTime - w.start) / dur));
+                    const wordLeft = span ? span.offsetLeft : 0;
+                    const wordWidth = span ? span.offsetWidth : 0;
+                    const curX = wordLeft + prog * wordWidth;
+                    revealPct = (curX / totalLineWidth) * 100;
+                    break;
+                }
+                if (currentTime < w.start) {
+                    const span = baseSpans[i];
+                    const curX = span ? span.offsetLeft : 0;
+                    revealPct = (curX / totalLineWidth) * 100;
+                    break;
+                }
             }
         }
-        fillEl.style.width = `${pct.toFixed(1)}%`;
-    });
+    }
+
+    revealPct = Math.max(0, Math.min(100, revealPct));
+    activeLayer.style.clipPath = `inset(0 ${Math.max(0, 100 - revealPct).toFixed(2)}% 0 0)`;
 }
 
 
@@ -4981,7 +5005,7 @@ function setupExport() {
     });
 
     // 3. Initialize default color & summary
-    applyStageActiveColor(state.colorActive || "#0018F5");
+    applyStageActiveColor(state.colorActive || "#0038FF");
     updateExportSummary();
 
     btnStartRender?.addEventListener("click", handleStartRender);
@@ -5001,13 +5025,13 @@ function applyStageActiveColor(colorHex) {
         const b = parseInt(hex.substring(4, 6), 16) || 0;
         const lum = 0.299 * r + 0.587 * g + 0.114 * b;
         if (lum < 160) {
-            // Dark / Saturated like KTV Royal Blue: White outline + Black drop shadow
-            stageScreen.style.setProperty("--stage-stroke-active", "3px #ffffff");
-            stageScreen.style.setProperty("--stage-shadow-active", "drop-shadow(2px 3px 0px #000000)");
+            // Dark / Saturated like KTV Royal Blue: White outline 6px + 4-way protective black drop shadow
+            stageScreen.style.setProperty("--stage-stroke-active", "6px #ffffff");
+            stageScreen.style.setProperty("--stage-shadow-active", "drop-shadow(1.5px 0 0 #000000) drop-shadow(-1.5px 0 0 #000000) drop-shadow(0 1.5px 0 #000000) drop-shadow(0 -1.5px 0 #000000) drop-shadow(3px 4px 0px rgba(0, 0, 0, 0.95))");
         } else {
-            // Light color (Yellow, White): Black outline + Black drop shadow
-            stageScreen.style.setProperty("--stage-stroke-active", "2.5px #000000");
-            stageScreen.style.setProperty("--stage-shadow-active", "drop-shadow(2px 3px 0px #000000)");
+            // Light color (Yellow, White): Black outline 6px + Black 3D drop shadow
+            stageScreen.style.setProperty("--stage-stroke-active", "6px #000000");
+            stageScreen.style.setProperty("--stage-shadow-active", "drop-shadow(3px 4px 0px rgba(0, 0, 0, 0.95))");
         }
     }
 
@@ -5051,9 +5075,10 @@ function updateExportSummary() {
         sizeEl.textContent = `${fs}px`;
     }
     if (colorDot && colorText) {
-        const c = state.colorActive || "#0018F5";
+        const c = state.colorActive || "#0038FF";
         colorDot.style.background = c;
         const knownColors = {
+            "#0038FF": "Xanh KTV Chuẩn",
             "#0018F5": "Xanh KTV Chuẩn",
             "#0022FF": "Xanh KTV Chuẩn",
             "#0000FF": "Xanh KTV Chuẩn",
@@ -5091,7 +5116,7 @@ async function handleStartRender() {
     const fontName = state.fontName ? state.fontName.replace(/['"]/g, "").split(",")[0].trim() : "Tahoma";
     const fontSize = state.fontSizeLine1 || state.fontSizeLine2 || 54;
     const primColor = hexToAssColor(state.colorInactive || "#ffffff");
-    const sungColor = hexToAssColor(state.colorActive || "#0018F5");
+    const sungColor = hexToAssColor(state.colorActive || "#0038FF");
 
     btnStartRender.disabled = true;
     btnStartRender.innerHTML = `<span>Đang xuất video (${fontName} - GPU NVENC)...</span>`;
