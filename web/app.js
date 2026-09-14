@@ -152,6 +152,12 @@ document.addEventListener("DOMContentLoaded", () => {
     setupExport();
     loadProjectsList();
     initVisualizer();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabParam = urlParams.get("tab");
+    if (tabParam) switchTab(tabParam);
+    const projParam = urlParams.get("project");
+    if (projParam) loadExistingProject(projParam);
 });
 
 async function fetchSystemInfo() {
@@ -249,12 +255,6 @@ function syncGuidedStepper(activeTab, isExport = false) {
 }
 
 function switchTab(targetId) {
-    let shouldScrollExport = false;
-    if (targetId === "exportTab") {
-        targetId = "playerTab";
-        shouldScrollExport = true;
-    }
-
     navTabs.forEach(t => {
         t.classList.toggle("active", t.getAttribute("data-tab") === targetId);
     });
@@ -263,13 +263,13 @@ function switchTab(targetId) {
     });
 
     // Sync Guided Stepper Bar (1-2-3)
-    syncGuidedStepper(targetId, shouldScrollExport);
+    syncGuidedStepper(targetId);
 
+    if (targetId === "exportTab") {
+        updateExportSummary();
+    }
     if (targetId === "libraryTab") {
         loadProjectsList();
-    }
-    if (shouldScrollExport) {
-        scrollToStudioExport();
     }
 }
 
@@ -2217,17 +2217,23 @@ function initMasterQuickActions() {
         if (btnToggleCinema) {
             btnToggleCinema.click();
         } else {
-            const stageWrapper = document.querySelector(".karaoke-stage-wrapper") || document.querySelector(".studio-main-col") || document.body;
-            const isCinema = stageWrapper.classList.toggle("cinema-active");
+            const layout = document.getElementById("studio3ColLayout") || document.querySelector(".studio-3col-layout") || document.body;
+            const isCinema = layout.classList.toggle("cinema-active");
             btnCinemaMaster.classList.toggle("active", isCinema);
-            btnCinemaMaster.textContent = isCinema ? "Thoát Rạp" : "Rạp Chiếu";
+            const textSpan = btnCinemaMaster.querySelector("span");
+            if (textSpan) {
+                textSpan.textContent = isCinema ? "Thoát Rạp Chiếu" : "Rạp Chiếu (Toàn Màn Hình)";
+            } else {
+                btnCinemaMaster.textContent = isCinema ? "Thoát Rạp" : "Rạp Chiếu";
+            }
+            showToastNotification(isCinema ? "Đã bật Chế độ Rạp Chiếu (Toàn cảnh)!" : "Đã trở về chế độ Studio");
         }
     });
 
     // 4. Quick Export Master Jump
     const btnExportMaster = document.getElementById("btnExportMaster");
     btnExportMaster?.addEventListener("click", () => {
-        scrollToStudioExport();
+        switchTab("exportTab");
     });
 }
 
@@ -4654,8 +4660,10 @@ function setupStudioMic() {
             micStream = null;
             btnToggleMic.classList.remove("active");
             const toggleText = document.getElementById("micToggleText");
-            if (toggleText) toggleText.textContent = "Bật Micro Hát Live";
-            if (micLiveIndicator) micLiveIndicator.style.display = "none";
+            if (toggleText) toggleText.textContent = "Bật Micro Live";
+            if (micLiveIndicator) {
+                micLiveIndicator.classList.remove("live");
+            }
             if (btnToggleMicMaster) {
                 btnToggleMicMaster.classList.remove("active");
                 btnToggleMicMaster.textContent = "Bật Micro";
@@ -4712,8 +4720,10 @@ function setupStudioMic() {
 
             btnToggleMic.classList.add("active");
             const toggleText = document.getElementById("micToggleText");
-            if (toggleText) toggleText.textContent = "Tắt Micro Hát Live";
-            if (micLiveIndicator) micLiveIndicator.style.display = "inline-block";
+            if (toggleText) toggleText.textContent = "Tắt Micro Live";
+            if (micLiveIndicator) {
+                micLiveIndicator.classList.add("live");
+            }
             if (btnToggleMicMaster) {
                 btnToggleMicMaster.classList.add("active");
                 btnToggleMicMaster.textContent = "Tắt Micro";
@@ -5033,7 +5043,13 @@ function setupExport() {
 
     // 3. Initialize default color & summary
     applyStageActiveColor(state.colorActive || "#0038FF");
-    updateExportSummary();
+    const chkShadow = document.getElementById("chkShadow");
+    chkShadow?.addEventListener("change", (e) => {
+        const stageScreen = document.getElementById("stageScreen") || document.getElementById("karaokeScreen");
+        if (stageScreen) {
+            stageScreen.classList.toggle("no-shadow", !e.target.checked);
+        }
+    });
 
     btnStartRender?.addEventListener("click", handleStartRender);
 }
