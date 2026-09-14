@@ -12,7 +12,7 @@ def sanitize_filename(name: str) -> str:
     return re.sub(r'[\\/*?:"<>|]', "", name).strip()
 
 def extract_clean_media_url(url: str) -> str:
-    """Extracts the latest URL if multiple URLs were accidentally pasted together."""
+    """Extracts the latest URL if multiple URLs were accidentally pasted together, and removes playlist clutter."""
     if not url:
         return ""
     url = url.strip()
@@ -20,6 +20,11 @@ def extract_clean_media_url(url: str) -> str:
     if last_http > 0:
         logger.warning(f"Multiple URLs detected in input: '{url}'. Extracting latest URL: '{url[last_http:]}'")
         url = url[last_http:]
+    # If it's a YouTube video with &list=..., strip the playlist parameters so yt-dlp only downloads this single video
+    if "youtube.com/watch" in url and "v=" in url:
+        url = re.sub(r"&list=[^&]+", "", url)
+        url = re.sub(r"&index=[^&]+", "", url)
+        url = re.sub(r"&start_radio=[^&]+", "", url)
     return url
 
 def has_node_runtime() -> bool:
@@ -117,6 +122,7 @@ def download_audio_from_url(url: str, output_dir: str, progress_callback = None)
             'quiet': True,
             'no_warnings': True,
             'http_headers': base_headers,
+            'noplaylist': True,
             'socket_timeout': 30,
             'retries': 5,
             'fragment_retries': 5,
