@@ -1,0 +1,21 @@
+=======================================================================
+               AI KARAOKE STUDIO PRO - HUONG DAN SU DUNG
+=======================================================================
+
+1. CAI DAT MOI TRUONG (CHI CHAY 1 LAN DAU TIEN TREN MAY MOI)
+   - Nhap dup chuot vao file:  1_CAI_DAT_MOI_TRUONG.bat
+   - He thong se tu dong tao moi truong ao (venv) va cai dat toan bo thu vien AI.
+   - Luu y: May can co san Python 3.10 hoac 3.11 tai tu https://www.python.org/downloads/
+     (Khi cai dat Python, nho TICH CHON vao o "Add Python to PATH").
+
+2. KHOI DONG PHONG THU
+   - Nhap dup chuot vao file:  2_KHOI_DONG_TOOL.bat
+   - Trinh duyet web se tu dong mo dia chi: http://127.0.0.1:8008
+
+3. CAC BUOC TAO VIDEO KARAOKE
+   - Buoc 1: Dan duong link YouTube hoac chon file bai hat (MP3, WAV...) tu may tinh.
+   - Buoc 2: Nhan "Bat dau tao Karaoke" va de AI tu dong tach beat Demucs va nhan dien loi Whisper.
+   - Buoc 3: Vao tab "Phong Thu" de nghe thu ca si / beat, sua loi tung tu hoac keo thanh truot vi tri chu (Dong 1, Dong 2).
+   - Buoc 4: Vao tab "Xuat File" de tai file phu de ASS (cho Aegisub, Premiere) hoac Render xuat video MP4 Karaoke Full HD.
+
+=======================================================================
