@@ -1,8 +1,10 @@
 import os
+import sys
 import subprocess
 import logging
 from pathlib import Path
 from typing import Optional
+import torch
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +62,7 @@ def render_karaoke_video(
     resolution: str = "1920x1080",
     fps: int = 30,
     use_gpu: bool = True,
+    pitch_semitones: int = 0,
     progress_callback = None
 ) -> str:
     """
@@ -102,6 +105,20 @@ def render_karaoke_video(
     is_macos = (sys.platform == "darwin")
     is_cuda = torch.cuda.is_available()
 
+    # Check for Intel QuickSync (QSV) hardware acceleration
+    has_qsv = False
+    if sys.platform == "win32" and not is_cuda:
+        try:
+            test_qsv = subprocess.run(
+                ["ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=64x64:d=0.1", "-c:v", "h264_qsv", "-f", "null", "-"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=2
+            )
+            has_qsv = (test_qsv.returncode == 0)
+        except Exception:
+            has_qsv = False
+
     if use_gpu and is_macos:
         video_encoder = "h264_videotoolbox"
         encoder_args = ["-b:v", "8000k", "-allow_sw", "1"]
@@ -110,10 +127,24 @@ def render_karaoke_video(
         video_encoder = "h264_nvenc"
         encoder_args = ["-preset", "p4", "-cq", "20"]
         gpu_label = "NVIDIA NVENC"
+    elif has_qsv:
+        video_encoder = "h264_qsv"
+        encoder_args = ["-b:v", "8000k", "-preset", "faster"]
+        gpu_label = "Intel QuickSync GPU"
     else:
         video_encoder = "libx264"
-        encoder_args = ["-preset", "fast", "-crf", "20"]
-        gpu_label = "CPU Software"
+        encoder_args = ["-preset", "veryfast", "-crf", "22", "-threads", "0"]
+        if not is_video_bg:
+            encoder_args.extend(["-tune", "stillimage"])
+        gpu_label = "CPU Software (Đa luồng Siêu Tốc)"
+
+    # Audio filter chain for pitch transpose without tempo change
+    af_args = []
+    af_cpu_args = []
+    if pitch_semitones != 0:
+        pitch_ratio = 2.0 ** (pitch_semitones / 12.0)
+        af_args = ["-af", f"rubberband=pitch={pitch_ratio:.6f}"]
+        af_cpu_args = ["-af", f"asetrate=44100*{pitch_ratio:.6f},atempo={1.0/pitch_ratio:.6f}"]
 
     cmd = [
         "ffmpeg", "-y",
@@ -121,6 +152,7 @@ def render_karaoke_video(
         "-vf", vf,
         "-c:v", video_encoder,
         *encoder_args,
+        *af_args,
         "-c:a", "aac",
         "-b:a", "320k",
         "-pix_fmt", "yuv420p",
@@ -129,23 +161,27 @@ def render_karaoke_video(
         str(out_file)
     ]
 
-    logger.info(f"Rendering video with FFmpeg ({gpu_label}): {' '.join(cmd)}")
+    logger.info(f"Rendering video with FFmpeg ({gpu_label}) [Pitch transpose: {pitch_semitones} semitones]: {' '.join(cmd)}")
     
     if progress_callback:
         progress_callback(90, f"Đang xuất video MP4 Karaoke (Tăng tốc {gpu_label})...")
 
     res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
     
-    # If NVENC fails, fallback to CPU libx264
-    if res.returncode != 0 and use_gpu:
-        logger.warning("GPU encoding failed, falling back to CPU libx264...")
+    # If hardware encoding fails, fallback to CPU libx264
+    if res.returncode != 0 and video_encoder != "libx264":
+        logger.warning(f"{gpu_label} encoding failed, falling back to CPU libx264...")
+        cpu_tune = ["-tune", "stillimage"] if not is_video_bg else []
         cmd_cpu = [
             "ffmpeg", "-y",
             *input_args,
             "-vf", vf,
             "-c:v", "libx264",
-            "-preset", "fast",
+            "-preset", "veryfast",
             "-crf", "22",
+            *cpu_tune,
+            "-threads", "0",
+            *af_cpu_args,
             "-c:a", "aac",
             "-b:a", "320k",
             "-pix_fmt", "yuv420p",

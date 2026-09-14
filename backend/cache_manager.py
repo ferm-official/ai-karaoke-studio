@@ -50,33 +50,94 @@ def save_stems_to_cache(file_hash: str, model_name: str, stems_dict: Dict[str, s
     cached_folder.mkdir(parents=True, exist_ok=True)
 
     for stem_name, file_path in stems_dict.items():
-        if file_path and Path(file_path).exists():
-            target = cached_folder / Path(file_path).name
-            if not target.exists():
-                shutil.copy2(file_path, target)
+        if isinstance(file_path, (str, Path)):
+            p = Path(file_path)
+            if p.exists() and p.is_file():
+                target = cached_folder / p.name
+                if not target.exists():
+                    shutil.copy2(p, target)
 
 def get_cached_transcription(file_hash: str, model_size: str, language: str, prompt: str = "") -> Optional[Dict[str, Any]]:
-    """Checks if transcription with same parameters is cached."""
+    """Checks if transcription with same parameters is cached and contains valid segments."""
     prompt_hash = hashlib.md5((prompt or "").encode("utf-8")).hexdigest()[:8]
-    cache_key = f"{file_hash}_{model_size}_{language}_{prompt_hash}.json"
+    cache_key = f"{file_hash}_{model_size}_{language}_v5music_{prompt_hash}.json"
     cache_file = TRANSCRIPT_CACHE_DIR / cache_key
 
     if cache_file.exists():
         try:
             with open(cache_file, "r", encoding="utf-8") as f:
-                logger.info(f"Transcription Cache HIT for {cache_key}")
-                return json.load(f)
+                data = json.load(f)
+                segs = data.get("segments", [])
+                if segs and len(segs) > 0:
+                    logger.info(f"Transcription Cache HIT for {cache_key} ({len(segs)} đoạn lời)")
+                    return data
+                else:
+                    logger.warning(f"Cache file {cache_key} has 0 segments, removing corrupt cache.")
+                    try:
+                        cache_file.unlink()
+                    except Exception:
+                        pass
+                    return None
         except Exception:
             return None
     return None
 
 def save_transcription_to_cache(file_hash: str, model_size: str, language: str, prompt: str, data: Dict[str, Any]):
-    """Saves transcription segments to persistent cache."""
+    """Saves transcription segments to persistent cache (only if valid segments exist)."""
+    if not data or not data.get("segments") or len(data["segments"]) == 0:
+        logger.warning(f"Skipping save to transcript cache: 0 segments")
+        return
+
     prompt_hash = hashlib.md5((prompt or "").encode("utf-8")).hexdigest()[:8]
-    cache_key = f"{file_hash}_{model_size}_{language}_{prompt_hash}.json"
+    cache_key = f"{file_hash}_{model_size}_{language}_v5music_{prompt_hash}.json"
     cache_file = TRANSCRIPT_CACHE_DIR / cache_key
     try:
         with open(cache_file, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
     except Exception as e:
         logger.error(f"Failed to write transcript cache: {e}")
+
+
+def clear_all_cache() -> Dict[str, Any]:
+    """Cleans all stems and transcript files from the persistent cache directory."""
+    deleted_files = 0
+    reclaimed_bytes = 0
+
+    if STEMS_CACHE_DIR.exists():
+        for item in list(STEMS_CACHE_DIR.iterdir()):
+            try:
+                if item.is_file():
+                    reclaimed_bytes += item.stat().st_size
+                    item.unlink()
+                    deleted_files += 1
+                elif item.is_dir():
+                    for sub in list(item.rglob('*')):
+                        if sub.is_file():
+                            reclaimed_bytes += sub.stat().st_size
+                            deleted_files += 1
+                    shutil.rmtree(item, ignore_errors=True)
+            except Exception as e:
+                logger.error(f"Error clearing stems cache item {item}: {e}")
+
+    if TRANSCRIPT_CACHE_DIR.exists():
+        for item in list(TRANSCRIPT_CACHE_DIR.iterdir()):
+            try:
+                if item.is_file():
+                    reclaimed_bytes += item.stat().st_size
+                    item.unlink()
+                    deleted_files += 1
+                elif item.is_dir():
+                    shutil.rmtree(item, ignore_errors=True)
+            except Exception as e:
+                logger.error(f"Error clearing transcript cache item {item}: {e}")
+
+    STEMS_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    TRANSCRIPT_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+    reclaimed_mb = round(reclaimed_bytes / (1024 * 1024), 2)
+    logger.info(f"Cleared all cache: {deleted_files} files, {reclaimed_mb} MB reclaimed")
+    return {
+        "deleted_files": deleted_files,
+        "reclaimed_mb": reclaimed_mb
+    }
+

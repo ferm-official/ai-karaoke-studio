@@ -11,10 +11,22 @@ def sanitize_filename(name: str) -> str:
     """Sanitizes string for safe filesystem usage."""
     return re.sub(r'[\\/*?:"<>|]', "", name).strip()
 
+def extract_clean_media_url(url: str) -> str:
+    """Extracts the latest URL if multiple URLs were accidentally pasted together."""
+    if not url:
+        return ""
+    url = url.strip()
+    last_http = url.rfind("http")
+    if last_http > 0:
+        logger.warning(f"Multiple URLs detected in input: '{url}'. Extracting latest URL: '{url[last_http:]}'")
+        url = url[last_http:]
+    return url
+
 def download_audio_from_url(url: str, output_dir: str, progress_callback = None) -> Dict[str, Any]:
     """
     Downloads highest quality audio from YouTube or any media URL using yt-dlp.
     """
+    url = extract_clean_media_url(url)
     if progress_callback:
         progress_callback(5, "Đang kiểm tra và tải nhạc từ liên kết URL...")
 

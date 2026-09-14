@@ -18,7 +18,12 @@ const state = {
     line2PosY: 0.76,
     fontSizeLine1: 52,
     fontSizeLine2: 52,
-    bgTheme: "nebula"
+    bgTheme: "nebula",
+    colorActive: "#0018F5",
+    colorInactive: "#ffffff",
+    currentPitchSemitones: 0,
+    wipingFxMode: "smooth",
+    showCountdownDots: true
 };
 
 // Audio Elements (synchronized dual-track)
@@ -39,15 +44,35 @@ const tabPanes = document.querySelectorAll(".tab-pane");
 // Mode Switch
 const modeFileBtn = document.getElementById("modeFileBtn");
 const modeUrlBtn = document.getElementById("modeUrlBtn");
+const modeStemsBtn = document.getElementById("modeStemsBtn");
 const dropZone = document.getElementById("dropZone");
 const urlZone = document.getElementById("urlZone");
+const stemsZone = document.getElementById("stemsZone");
 const audioFileInput = document.getElementById("audioFileInput");
 const selectedFilePill = document.getElementById("selectedFilePill");
 const selectedFileName = document.getElementById("selectedFileName");
 const clearFileBtn = document.getElementById("clearFileBtn");
 const urlInput = document.getElementById("urlInput");
 const clearUrlBtn = document.getElementById("clearUrlBtn");
+
+const instDropZone = document.getElementById("instDropZone");
+const instFileInput = document.getElementById("instFileInput");
+const instFilePill = document.getElementById("instFilePill");
+const instFileName = document.getElementById("instFileName");
+const clearInstFileBtn = document.getElementById("clearInstFileBtn");
+
+const vocalDropZone = document.getElementById("vocalDropZone");
+const vocalFileInput = document.getElementById("vocalFileInput");
+const vocalFilePill = document.getElementById("vocalFilePill");
+const vocalFileName = document.getElementById("vocalFileName");
+const clearVocalFileBtn = document.getElementById("clearVocalFileBtn");
+const stemsSongTitle = document.getElementById("stemsSongTitle");
+
+let selectedInstFile = null;
+let selectedVocalFile = null;
+
 const startProcessBtn = document.getElementById("startProcessBtn");
+
 
 // Config inputs
 const langSelect = document.getElementById("langSelect");
@@ -94,6 +119,8 @@ const dlInstrumentalBtn = document.getElementById("dlInstrumentalBtn");
 const dlVocalBtn = document.getElementById("dlVocalBtn");
 const dlAssSubBtn = document.getElementById("dlAssSubBtn");
 const dlLrcSubBtn = document.getElementById("dlLrcSubBtn");
+const dlSrtSubBtn = document.getElementById("dlSrtSubBtn");
+
 
 // Library
 const projectsGrid = document.getElementById("projectsGrid");
@@ -130,12 +157,34 @@ async function fetchSystemInfo() {
     try {
         const res = await fetch("/api/system-info");
         const data = await res.json();
+        state.cudaAvailable = data.cuda_available;
+        const hwInput = document.getElementById("hardwareModeInput");
+        const hwGpuBtn = document.getElementById("hwGpuBtn");
+        const hwCpuBtn = document.getElementById("hwCpuBtn");
+
         if (data.cuda_available) {
-            gpuStatusText.textContent = `${data.gpu_name} (${data.vram_gb} GB VRAM) • GPU CUDA Online`;
+            gpuStatusText.textContent = `${data.gpu_name} • GPU CUDA Online`;
             gpuStatusText.style.color = "#10B981";
+            if (hwInput) hwInput.value = "gpu";
+            if (hwGpuBtn && hwCpuBtn) {
+                hwGpuBtn.classList.add("active");
+                hwCpuBtn.classList.remove("active");
+            }
         } else {
-            gpuStatusText.textContent = "Chế độ CPU (Không tìm thấy GPU)";
-            gpuStatusText.style.color = "#F59E0B";
+            const cpuLabel = data.gpu_name ? `Phần Cứng: ${data.gpu_name}` : "Phần Cứng: CPU Đa Luồng";
+            gpuStatusText.textContent = cpuLabel;
+            gpuStatusText.style.color = "#38BDF8";
+            if (hwInput) hwInput.value = "cpu";
+            if (hwGpuBtn && hwCpuBtn) {
+                hwCpuBtn.classList.add("active");
+                hwGpuBtn.classList.remove("active");
+                hwGpuBtn.style.opacity = "0.6";
+                const gpuSub = hwGpuBtn.querySelector(".hw-sub");
+                if (gpuSub) gpuSub.textContent = "Máy không có card rời NVIDIA • Đang tối ưu CPU";
+            }
+            if (whisperModelSelect) {
+                whisperModelSelect.value = "small";
+            }
         }
     } catch (e) {
         gpuStatusText.textContent = "100% Local Server Connected";
@@ -154,19 +203,72 @@ function setupNavigation() {
         });
     });
 
+    // Guided 3-Step Journey Bar for Beginners
+    document.querySelectorAll(".stepper-step").forEach(step => {
+        step.addEventListener("click", () => {
+            const targetTab = step.getAttribute("data-tab");
+            if (targetTab) switchTab(targetTab);
+        });
+    });
+
     document.getElementById("btnGoToEditor")?.addEventListener("click", () => switchTab("editorTab"));
     document.getElementById("btnGoToExport")?.addEventListener("click", () => switchTab("exportTab"));
+    document.getElementById("btnRedirectToStudioExport")?.addEventListener("click", () => switchTab("exportTab"));
+}
+
+function scrollToStudioExport() {
+    if (typeof openInspectorPane === "function") {
+        openInspectorPane("paneExport");
+    }
+    setTimeout(() => {
+        const el = document.getElementById("stageInspectorContainer");
+        if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+    }, 100);
+}
+
+function syncGuidedStepper(activeTab, isExport = false) {
+    const step1 = document.getElementById("step1Indicator");
+    const step2 = document.getElementById("step2Indicator");
+    const step3 = document.getElementById("step3Indicator");
+    if (!step1 || !step2 || !step3) return;
+
+    step1.classList.remove("active");
+    step2.classList.remove("active");
+    step3.classList.remove("active");
+
+    if (activeTab === "createTab") {
+        step1.classList.add("active");
+    } else if (isExport || activeTab === "exportTab") {
+        step3.classList.add("active");
+    } else {
+        step2.classList.add("active");
+    }
 }
 
 function switchTab(targetId) {
+    let shouldScrollExport = false;
+    if (targetId === "exportTab") {
+        targetId = "playerTab";
+        shouldScrollExport = true;
+    }
+
     navTabs.forEach(t => {
         t.classList.toggle("active", t.getAttribute("data-tab") === targetId);
     });
     tabPanes.forEach(p => {
         p.classList.toggle("active", p.id === targetId);
     });
+
+    // Sync Guided Stepper Bar (1-2-3)
+    syncGuidedStepper(targetId, shouldScrollExport);
+
     if (targetId === "libraryTab") {
         loadProjectsList();
+    }
+    if (shouldScrollExport) {
+        scrollToStudioExport();
     }
 }
 
@@ -176,20 +278,102 @@ function switchTab(targetId) {
    ======================================================== */
 let selectedFile = null;
 
+function extractCleanMediaUrl(raw) {
+    if (!raw) return "";
+    let s = raw.trim();
+    const lastHttp = s.lastIndexOf("http");
+    if (lastHttp > 0) {
+        return s.substring(lastHttp).trim();
+    }
+    return s;
+}
+
+function resetCreationForm() {
+    if (urlInput) urlInput.value = "";
+    selectedFile = null;
+    if (audioFileInput) audioFileInput.value = "";
+    if (selectedFilePill) selectedFilePill.style.display = "none";
+    selectedInstFile = null;
+    if (instFileInput) instFileInput.value = "";
+    if (instFilePill) instFilePill.style.display = "none";
+    selectedVocalFile = null;
+    if (vocalFileInput) vocalFileInput.value = "";
+    if (vocalFilePill) vocalFilePill.style.display = "none";
+    if (stemsSongTitle) stemsSongTitle.value = "";
+    const lyricsInput = document.getElementById("customLyricsInput");
+    if (lyricsInput) lyricsInput.value = "";
+    const badge = document.getElementById("lyricsStatusBadge");
+    if (badge) badge.style.display = "none";
+}
+
 function setupUploadHandlers() {
     modeFileBtn.addEventListener("click", () => {
         modeFileBtn.classList.add("active");
         modeUrlBtn.classList.remove("active");
+        modeStemsBtn?.classList.remove("active");
         dropZone.style.display = "block";
         urlZone.style.display = "none";
+        if (stemsZone) stemsZone.style.display = "none";
     });
 
     modeUrlBtn.addEventListener("click", () => {
         modeUrlBtn.classList.add("active");
         modeFileBtn.classList.remove("active");
+        modeStemsBtn?.classList.remove("active");
         urlZone.style.display = "block";
         dropZone.style.display = "none";
+        if (stemsZone) stemsZone.style.display = "none";
     });
+
+    modeStemsBtn?.addEventListener("click", () => {
+        modeStemsBtn.classList.add("active");
+        modeFileBtn.classList.remove("active");
+        modeUrlBtn.classList.remove("active");
+        if (stemsZone) stemsZone.style.display = "block";
+        dropZone.style.display = "none";
+        urlZone.style.display = "none";
+    });
+
+    // Stems Dropzones & Inputs
+    if (instDropZone && instFileInput) {
+        instDropZone.addEventListener("click", () => instFileInput.click());
+        instDropZone.addEventListener("dragover", (e) => { e.preventDefault(); instDropZone.classList.add("dragover"); });
+        instDropZone.addEventListener("dragleave", () => instDropZone.classList.remove("dragover"));
+        instDropZone.addEventListener("drop", (e) => {
+            e.preventDefault();
+            instDropZone.classList.remove("dragover");
+            if (e.dataTransfer.files.length > 0) handleInstFileSelected(e.dataTransfer.files[0]);
+        });
+        instFileInput.addEventListener("change", (e) => {
+            if (e.target.files.length > 0) handleInstFileSelected(e.target.files[0]);
+        });
+        clearInstFileBtn?.addEventListener("click", (e) => {
+            e.stopPropagation();
+            selectedInstFile = null;
+            instFileInput.value = "";
+            if (instFilePill) instFilePill.style.display = "none";
+        });
+    }
+
+    if (vocalDropZone && vocalFileInput) {
+        vocalDropZone.addEventListener("click", () => vocalFileInput.click());
+        vocalDropZone.addEventListener("dragover", (e) => { e.preventDefault(); vocalDropZone.classList.add("dragover"); });
+        vocalDropZone.addEventListener("dragleave", () => vocalDropZone.classList.remove("dragover"));
+        vocalDropZone.addEventListener("drop", (e) => {
+            e.preventDefault();
+            vocalDropZone.classList.remove("dragover");
+            if (e.dataTransfer.files.length > 0) handleVocalFileSelected(e.dataTransfer.files[0]);
+        });
+        vocalFileInput.addEventListener("change", (e) => {
+            if (e.target.files.length > 0) handleVocalFileSelected(e.target.files[0]);
+        });
+        clearVocalFileBtn?.addEventListener("click", (e) => {
+            e.stopPropagation();
+            selectedVocalFile = null;
+            vocalFileInput.value = "";
+            if (vocalFilePill) vocalFilePill.style.display = "none";
+        });
+    }
 
     dropZone.addEventListener("click", () => audioFileInput.click());
 
@@ -219,10 +403,57 @@ function setupUploadHandlers() {
         selectedFile = null;
         audioFileInput.value = "";
         selectedFilePill.style.display = "none";
+        const badge = document.getElementById("lyricsStatusBadge");
+        if (badge) badge.style.display = "none";
     });
 
-    clearUrlBtn.addEventListener("click", () => {
-        urlInput.value = "";
+    clearUrlBtn?.addEventListener("click", () => {
+        if (urlInput) urlInput.value = "";
+        const badge = document.getElementById("lyricsStatusBadge");
+        if (badge) badge.style.display = "none";
+    });
+
+    urlInput?.addEventListener("focus", function() {
+        this.select();
+    });
+
+    urlInput?.addEventListener("click", function() {
+        if (this.value) this.select();
+    });
+
+    urlInput?.addEventListener("paste", function() {
+        setTimeout(() => {
+            if (!urlInput) return;
+            const raw = urlInput.value;
+            const cleaned = extractCleanMediaUrl(raw);
+            if (cleaned !== raw) {
+                urlInput.value = cleaned;
+                showToastNotification("Đã tự động lọc đường link mới nhất!");
+            }
+        }, 10);
+    });
+
+    urlInput?.addEventListener("input", function() {
+        const raw = urlInput.value;
+        const cleaned = extractCleanMediaUrl(raw);
+        if (cleaned !== raw) {
+            urlInput.value = cleaned;
+        }
+    });
+
+    // Auto-fetch Lyrics Button
+    const btnAutoFetchLyrics = document.getElementById("btnAutoFetchLyrics");
+    btnAutoFetchLyrics?.addEventListener("click", () => {
+        let defaultVal = "";
+        if (selectedFile) {
+            defaultVal = selectedFile.name;
+        } else if (urlInput && urlInput.value) {
+            defaultVal = urlInput.value;
+        }
+        const userQuery = prompt("Nhập tên bài hát hoặc ca sĩ để tìm lời online:", defaultVal);
+        if (userQuery && userQuery.trim()) {
+            triggerOnlineLyricsSearch(userQuery.trim(), true);
+        }
     });
 
     // Hardware Mode Toggle
@@ -242,16 +473,240 @@ function setupUploadHandlers() {
         if (hardwareModeInput) hardwareModeInput.value = "cpu";
     });
 
+    // AI Transcription Engine Toggle (Whisper vs Gemini)
+    const engineWhisperBtn = document.getElementById("engineWhisperBtn");
+    const engineGeminiBtn = document.getElementById("engineGeminiBtn");
+    const transcriptionEngineInput = document.getElementById("transcriptionEngineInput");
+    const geminiIdeaGroup = document.getElementById("geminiIdeaGroup");
+
+    engineWhisperBtn?.addEventListener("click", () => {
+        engineWhisperBtn.classList.add("active");
+        engineGeminiBtn?.classList.remove("active");
+        if (transcriptionEngineInput) transcriptionEngineInput.value = "whisper";
+        if (geminiIdeaGroup) geminiIdeaGroup.style.display = "none";
+    });
+
+    engineGeminiBtn?.addEventListener("click", async () => {
+        engineGeminiBtn.classList.add("active");
+        engineWhisperBtn?.classList.remove("active");
+        if (transcriptionEngineInput) transcriptionEngineInput.value = "gemini";
+        if (geminiIdeaGroup) geminiIdeaGroup.style.display = "block";
+
+        // Check if API key is configured
+        try {
+            const res = await fetch("/api/config");
+            if (res.ok) {
+                const conf = await res.json();
+                if (!conf.has_key) {
+                    showToastNotification("Bạn chưa nhập Gemini API Key. Nhấn 'Cài Đặt Gemini' để cấu hình nhé!");
+                } else {
+                    showToastNotification("Đã bật Gemini AI Cloud. Nhập ý tưởng/lời nhắc nếu muốn tùy biến!");
+                }
+            }
+        } catch (e) {}
+    });
+
+    // Preset: Suno AI / New Song Workflow
+    const btnPresetSuno = document.getElementById("btnPresetSuno");
+    btnPresetSuno?.addEventListener("click", () => {
+        // Expand advanced accordion if closed
+        const advAccordion = document.getElementById("advancedConfigAccordion");
+        if (advAccordion) advAccordion.open = true;
+
+        // Switch to Gemini engine
+        engineGeminiBtn?.click();
+
+        // Focus & highlight custom lyrics input
+        const lyricsInput = document.getElementById("customLyricsInput");
+        if (lyricsInput) {
+            lyricsInput.scrollIntoView({ behavior: "smooth", block: "center" });
+            lyricsInput.focus();
+            lyricsInput.style.borderColor = "#a855f7";
+            lyricsInput.style.boxShadow = "0 0 14px rgba(168, 85, 247, 0.4)";
+            showToastNotification("Đã bật chế độ Suno AI / Bài mới! Hãy dán lời bài hát vào ô Lời Chuẩn.");
+            setTimeout(() => {
+                lyricsInput.style.borderColor = "";
+                lyricsInput.style.boxShadow = "";
+            }, 4000);
+        }
+    });
+
+    // Idea Quick Pills
+    document.querySelectorAll(".idea-pill").forEach(pill => {
+        pill.addEventListener("click", () => {
+            const ideaText = pill.getAttribute("data-idea");
+            const ideaInput = document.getElementById("ideaPromptInput");
+            if (ideaInput) {
+                if (ideaInput.value.trim()) {
+                    ideaInput.value = `${ideaInput.value.trim()}\n${ideaText}`;
+                } else {
+                    ideaInput.value = ideaText;
+                }
+                ideaInput.focus();
+            }
+        });
+    });
+
+    // Gemini Settings Modal
+    const geminiModal = document.getElementById("geminiModal");
+    const btnOpenGeminiSettings = document.getElementById("btnOpenGeminiSettings");
+    const closeGeminiModalBtn = document.getElementById("closeGeminiModalBtn");
+    const cancelGeminiModalBtn = document.getElementById("cancelGeminiModalBtn");
+    const saveGeminiConfigBtn = document.getElementById("saveGeminiConfigBtn");
+    const geminiApiKeyInput = document.getElementById("geminiApiKeyInput");
+    const geminiModelSelect = document.getElementById("geminiModelSelect");
+
+    const openGeminiModal = async () => {
+        if (!geminiModal) return;
+        geminiModal.style.display = "flex";
+        try {
+            const res = await fetch("/api/config");
+            if (res.ok) {
+                const conf = await res.json();
+                if (geminiApiKeyInput) {
+                    geminiApiKeyInput.value = "";
+                    geminiApiKeyInput.placeholder = conf.has_key ? `Đã lưu: ${conf.masked_key} (nhập mới để đổi)` : "AIzaSy... (Dán API Key vào đây)";
+                }
+                if (geminiModelSelect && conf.gemini_model) {
+                    geminiModelSelect.value = conf.gemini_model;
+                }
+            }
+        } catch (e) {}
+    };
+
+    btnOpenGeminiSettings?.addEventListener("click", openGeminiModal);
+    closeGeminiModalBtn?.addEventListener("click", () => { if (geminiModal) geminiModal.style.display = "none"; });
+    cancelGeminiModalBtn?.addEventListener("click", () => { if (geminiModal) geminiModal.style.display = "none"; });
+
+    saveGeminiConfigBtn?.addEventListener("click", async () => {
+        const key = geminiApiKeyInput?.value.trim();
+        const model = geminiModelSelect?.value || "gemini-2.5-flash";
+        const form = new FormData();
+        if (key) form.append("gemini_api_key", key);
+        form.append("gemini_model", model);
+
+        try {
+            saveGeminiConfigBtn.textContent = "Đang lưu...";
+            saveGeminiConfigBtn.disabled = true;
+            const res = await fetch("/api/config", { method: "POST", body: form });
+            const data = await res.json();
+            if (res.ok && data.status === "success") {
+                showToastNotification("Đã lưu cấu hình Gemini AI thành công!");
+                if (geminiModal) geminiModal.style.display = "none";
+            } else {
+                alert("Lỗi khi lưu: " + (data.detail || data.message || "Unknown error"));
+            }
+        } catch (e) {
+            alert("Lỗi kết nối: " + e.message);
+        } finally {
+            saveGeminiConfigBtn.textContent = "Lưu Cài Đặt";
+            saveGeminiConfigBtn.disabled = false;
+        }
+    });
+
+    whisperModelSelect?.addEventListener("change", () => {
+        const isCpu = hardwareModeInput?.value === "cpu";
+        if (isCpu && whisperModelSelect.value === "large-v3") {
+            showToastNotification("Khuyên dùng bản 'Small' trên CPU để xử lý nhanh nhất (~30 giây)");
+        }
+    });
+
     startProcessBtn.addEventListener("click", handleStartProcessing);
+    document.getElementById("startProcessBtnSimple")?.addEventListener("click", handleStartProcessing);
+}
+
+async function triggerOnlineLyricsSearch(query, isManual = false) {
+    if (!query || !query.trim()) return;
+    const btn = document.getElementById("btnAutoFetchLyrics");
+    const badge = document.getElementById("lyricsStatusBadge");
+    const lyricsInput = document.getElementById("customLyricsInput");
+
+    if (btn) btn.textContent = "Đang tìm...";
+
+    try {
+        let url = `/api/search-lyrics?query=${encodeURIComponent(query.trim())}`;
+        if (window._selectedFileDuration && window._selectedFileDuration > 0) {
+            url += `&duration=${window._selectedFileDuration.toFixed(1)}`;
+        }
+        const res = await fetch(url);
+        if (res.ok) {
+            const data = await res.json();
+            if (data.status === "found" && (data.plain_lyrics || data.synced_lyrics)) {
+                if (lyricsInput) {
+                    lyricsInput.value = (data.is_synced_truncated && data.plain_lyrics) ? data.plain_lyrics : (data.synced_lyrics || data.plain_lyrics);
+                }
+                if (badge) {
+                    badge.textContent = `Đã tìm thấy: ${data.title}`;
+                    badge.style.display = "inline-block";
+                }
+                showToastNotification(`Đã tìm thấy lời chuẩn: ${data.title}`);
+                if (btn) btn.textContent = "Tìm Lời Online";
+                return;
+            }
+        }
+    } catch (e) {
+        console.error("Lyrics search error:", e);
+    }
+
+    if (btn) btn.textContent = "Tìm Lời Online";
+    if (badge) badge.style.display = "none";
+    if (isManual) {
+        showToastNotification("Không tìm thấy lời bài hát online. AI sẽ tự động nghe từ giọng hát.");
+    }
 }
 
 function handleFileSelected(file) {
     selectedFile = file;
     selectedFileName.textContent = `${file.name} (${(file.size / (1024 * 1024)).toFixed(1)} MB)`;
     selectedFilePill.style.display = "inline-flex";
+
+    try {
+        const audio = new Audio();
+        audio.src = URL.createObjectURL(file);
+        audio.onloadedmetadata = () => {
+            window._selectedFileDuration = audio.duration;
+            URL.revokeObjectURL(audio.src);
+        };
+    } catch(e) {}
+
+    // Auto search lyrics when file is selected
+    triggerOnlineLyricsSearch(file.name);
+}
+
+function handleInstFileSelected(file) {
+    selectedInstFile = file;
+    instFileName.textContent = `${file.name} (${(file.size / (1024 * 1024)).toFixed(1)} MB)`;
+    instFilePill.style.display = "inline-flex";
+
+    if (stemsSongTitle && !stemsSongTitle.value.trim()) {
+        let cleanTitle = file.name.replace(/\.[^/.]+$/, "");
+        ["instrumental", "beat", "karaoke", "no_vocals", "minus_vocals", "vocal_remover"].forEach(kw => {
+            cleanTitle = cleanTitle.replace(new RegExp(kw, "gi"), "");
+        });
+        cleanTitle = cleanTitle.replace(/[-_]+/g, " ").trim();
+        if (cleanTitle) stemsSongTitle.value = cleanTitle;
+    }
+
+    try {
+        const audio = new Audio();
+        audio.src = URL.createObjectURL(file);
+        audio.onloadedmetadata = () => {
+            window._selectedFileDuration = audio.duration;
+            URL.revokeObjectURL(audio.src);
+        };
+    } catch(e) {}
+
+    triggerOnlineLyricsSearch(stemsSongTitle?.value || file.name);
+}
+
+function handleVocalFileSelected(file) {
+    selectedVocalFile = file;
+    vocalFileName.textContent = `${file.name} (${(file.size / (1024 * 1024)).toFixed(1)} MB)`;
+    vocalFilePill.style.display = "inline-flex";
 }
 
 async function handleStartProcessing() {
+    const isStemsMode = modeStemsBtn?.classList.contains("active");
     const isFileMode = modeFileBtn.classList.contains("active");
     const lang = langSelect.value;
     const whisperModel = whisperModelSelect.value;
@@ -259,6 +714,8 @@ async function handleStartProcessing() {
     const customLyrics = document.getElementById("customLyricsInput")?.value.trim() || "";
     const useCache = document.getElementById("useCacheCheckbox")?.checked ?? true;
     const deviceMode = document.getElementById("hardwareModeInput")?.value || "gpu";
+    const transcriptionEngine = document.getElementById("transcriptionEngineInput")?.value || "whisper";
+    const ideaPrompt = document.getElementById("ideaPromptInput")?.value.trim() || "";
 
     let formData = new FormData();
     formData.append("language", lang);
@@ -266,13 +723,27 @@ async function handleStartProcessing() {
     formData.append("demucs_model", demucsModel);
     formData.append("use_cache", useCache ? "true" : "false");
     formData.append("device_mode", deviceMode);
+    formData.append("transcription_engine", transcriptionEngine);
+    formData.append("idea_prompt", ideaPrompt);
     if (customLyrics) {
         formData.append("custom_lyrics", customLyrics);
     }
 
     let endpoint = "";
 
-    if (isFileMode) {
+    if (isStemsMode) {
+        if (!selectedInstFile) {
+            alert("Vui lòng chọn hoặc kéo thả File Nhạc Beat (Instrumental)!");
+            return;
+        }
+        formData.append("instrumental_file", selectedInstFile);
+        if (selectedVocalFile) {
+            formData.append("vocal_file", selectedVocalFile);
+        }
+        const songTitle = stemsSongTitle?.value.trim() || selectedInstFile.name.replace(/\.[^/.]+$/, "");
+        formData.append("song_title", songTitle);
+        endpoint = "/api/upload-stems";
+    } else if (isFileMode) {
         if (!selectedFile) {
             alert("Vui lòng chọn hoặc kéo thả 1 file âm thanh / video!");
             return;
@@ -280,7 +751,7 @@ async function handleStartProcessing() {
         formData.append("file", selectedFile);
         endpoint = "/api/upload";
     } else {
-        const url = urlInput.value.trim();
+        const url = extractCleanMediaUrl(urlInput.value);
         if (!url) {
             alert("Vui lòng nhập đường dẫn URL bài hát!");
             return;
@@ -316,13 +787,25 @@ function showProgressModal() {
     processModal.style.display = "flex";
     modalProgressFill.style.width = "5%";
     modalProgressPct.textContent = "5%";
-    modalTitle.textContent = "AI Đang Xử Lý Bài Hát...";
-    modalSub.textContent = "Đang tách Beat và nhận diện lời từng từ trên GPU RTX 3060...";
-    
-    stepUpload.className = "step-item active";
-    stepDemucs.className = "step-item";
-    stepWhisper.className = "step-item";
-    stepSub.className = "step-item";
+
+    if (modeStemsBtn?.classList.contains("active")) {
+        modalTitle.textContent = "Đang Nạp Beat & Bắt Nhịp Lời...";
+        modalSub.textContent = "Bỏ qua tách Beat (0s) - Bắt nhịp phụ đề tức thì!";
+        stepUpload.className = "step-item completed";
+        stepDemucs.className = "step-item completed";
+        stepWhisper.className = "step-item active";
+        stepSub.className = "step-item";
+    } else {
+        modalTitle.textContent = "AI Đang Xử Lý Bài Hát...";
+        modalSub.textContent = state.cudaAvailable 
+            ? "Đang tách Beat và nhận diện lời trên GPU CUDA..." 
+            : "Đang tách Beat và nhận diện lời trên CPU Đa Luồng...";
+        
+        stepUpload.className = "step-item active";
+        stepDemucs.className = "step-item";
+        stepWhisper.className = "step-item";
+        stepSub.className = "step-item";
+    }
 }
 
 function hideProgressModal() {
@@ -342,10 +825,14 @@ function startPollingStatus(projectId) {
 
             if (job.status === "ready") {
                 clearInterval(state.pollTimer);
-                hideProgressModal();
-                loadProjectData(job.data);
-                switchTab("playerTab");
-            } else if (job.status === "error") {
+                updateModalProgress({ progress: 100, message: "Đã hoàn tất xử lý! Đang mở phòng thu Karaoke..." });
+                setTimeout(() => {
+                    hideProgressModal();
+                    loadProjectData(job.data);
+                    switchTab("playerTab");
+                    resetCreationForm();
+                }, 500);
+            } else if (job.status === "error" || job.status === "failed") {
                 clearInterval(state.pollTimer);
                 alert(`Xử lý thất bại: ${job.error || job.message}`);
                 hideProgressModal();
@@ -353,7 +840,7 @@ function startPollingStatus(projectId) {
         } catch (e) {
             console.error("Poll error:", e);
         }
-    }, 1000);
+    }, 400);
 }
 
 function updateModalProgress(job) {
@@ -380,40 +867,132 @@ function updateModalProgress(job) {
 /* ========================================================
    4. LOAD PROJECT DATA & PREPARE STUDIO
    ======================================================== */
-function ensureConciseSegments(segments, maxWords = 5) {
+function ensureConciseSegments(segments, maxWords = 6, maxChars = 28, maxDur = 4.0) {
     if (!segments || !segments.length) return [];
+    segments = segments.filter(s => (s.text || "").trim().length > 0);
+    if (!segments.length) return [];
     let out = [];
 
     function splitSingleSeg(seg) {
-        const words = seg.words || [];
-        if (words.length <= maxWords && (seg.end - seg.start) <= 3.2) {
-            return [seg];
-        }
-        if (words.length < 4) return [seg];
+        let words = seg.words || [];
+        const text = (seg.text || "").trim();
 
-        let splitIdx = Math.floor(words.length / 2);
-        for (let i = Math.max(1, Math.floor(words.length * 0.3)); i <= Math.min(words.length - 2, Math.floor(words.length * 0.7)); i++) {
-            const w = words[i].word || "";
-            if (/[,\.;\-!\?]/.test(w)) {
-                splitIdx = i + 1;
-                break;
+        // If words is empty or missing, synthesize word tokens from text
+        if (!words.length && text) {
+            const wList = text.split(/\s+/);
+            if (wList.length <= maxWords && text.length <= maxChars) return [seg];
+            const st = parseFloat(seg.start || 0);
+            const en = parseFloat(seg.end || st + 3);
+            const dur = Math.max(0.2, en - st);
+            const step = dur / Math.max(1, wList.length);
+            words = wList.map((w, idx) => ({
+                word: w,
+                start: +(st + idx * step).toFixed(3),
+                end: +(st + (idx + 1) * step).toFixed(3),
+                probability: 1.0
+            }));
+            seg.words = words;
+        }
+
+        const numWords = words.length;
+        const dur = (seg.end || 0) - (seg.start || 0);
+        const numChars = text.length;
+
+        let shouldSplit = false;
+        if (numWords > maxWords || numChars > maxChars || dur > maxDur) {
+            shouldSplit = true;
+        } else if (numWords >= 5) {
+            // Check for middle capital word, punctuation, or acoustic silence gap
+            for (let i = 2; i < numWords - 1; i++) {
+                const w = (words[i].word || "").trim();
+                const prevW = (words[i - 1].word || "").trim();
+                if (w && /^[A-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠƯ]/.test(w) && !w.startsWith("I'")) {
+                    shouldSplit = true;
+                    break;
+                }
+                if (/[,\.;:\-—!\?]/.test(prevW)) {
+                    shouldSplit = true;
+                    break;
+                }
+                const gap = (words[i].start || 0) - (words[i - 1].end || 0);
+                if (gap >= 0.15) {
+                    shouldSplit = true;
+                    break;
+                }
             }
         }
 
-        const wordsA = words.slice(0, splitIdx);
-        const wordsB = words.slice(splitIdx);
+        if (!shouldSplit || numWords < 4) {
+            return [seg];
+        }
+
+        const minSplit = Math.max(2, Math.floor(numWords * 0.28));
+        const maxSplit = Math.min(numWords - 2, Math.ceil(numWords * 0.72));
+
+        let bestIdx = Math.floor(numWords / 2);
+        let bestScore = -999;
+
+        for (let i = minSplit; i <= maxSplit; i++) {
+            const prevW = words[i - 1];
+            const currW = words[i];
+            let score = 0;
+
+            const prevWord = (prevW.word || "").trim();
+            const currWord = (currW.word || "").trim();
+
+            // 1. Capitalized current word (start of new clause)
+            if (currWord && /^[A-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠƯ]/.test(currWord) && !currWord.startsWith("I'")) {
+                score += 16;
+            }
+
+            // 2. Punctuation at end of previous word
+            if (/[.;:\-—!\?]/.test(prevWord)) {
+                score += 16;
+            } else if (prevWord.endsWith(",")) {
+                score += 10;
+            }
+
+            // 3. Acoustic silence gap
+            const gap = (currW.start || 0) - (prevW.end || 0);
+            if (gap >= 0.12) score += Math.min(20, gap * 28);
+
+            // 4. Clause connectors
+            const cleanCurr = currWord.toLowerCase().replace(/[,\.;:\-—!\?']/g, "");
+            if (["và", "mà", "thì", "nhưng", "rồi", "khi", "để", "cho", "anh", "em", "người", "tôi", "like", "to", "with", "for", "in", "goin", "living"].includes(cleanCurr)) {
+                score += 5;
+            }
+
+            // Midpoint preference
+            score -= Math.abs(i - (numWords / 2)) * 0.5;
+
+            if (score > bestScore) {
+                bestScore = score;
+                bestIdx = i;
+            }
+        }
+
+        const wordsA = words.slice(0, bestIdx);
+        const wordsB = words.slice(bestIdx);
 
         if (!wordsA.length || !wordsB.length) return [seg];
 
+        // Capitalize first word of second segment if lowercase
+        if (wordsB[0] && wordsB[0].word) {
+            const w0 = wordsB[0].word;
+            if (w0 && /^[a-zàáâãèéêìíòóôõùúăđĩũơư]/.test(w0)) {
+                wordsB[0] = { ...wordsB[0], word: w0.charAt(0).toUpperCase() + w0.slice(1) };
+            }
+        }
+
         const segA = {
-            id: 0,
+            id: seg.id || 0,
             start: wordsA[0].start,
             end: wordsA[wordsA.length - 1].end,
             text: wordsA.map(w => w.word).join(" "),
             words: wordsA
         };
         const segB = {
-            id: 0,
+            id: seg.id || 0,
             start: wordsB[0].start,
             end: wordsB[wordsB.length - 1].end,
             text: wordsB.map(w => w.word).join(" "),
@@ -446,6 +1025,10 @@ function loadProjectData(projectData) {
     dlVocalBtn.href = projectData.stems?.vocals_mp3 || "#";
     dlAssSubBtn.href = projectData.subtitles?.ass || "#";
     dlLrcSubBtn.href = projectData.subtitles?.lrc || "#";
+    if (dlSrtSubBtn) {
+        dlSrtSubBtn.href = projectData.subtitles?.srt || "#";
+    }
+
 
     if (projectData.video_url) {
         renderedVideoPlayer.src = projectData.video_url;
@@ -459,9 +1042,13 @@ function loadProjectData(projectData) {
         dlVideoBtn.style.display = "none";
     }
 
-    // Ensure all loaded segments strictly conform to 3-5 words per line
-    projectData.segments = ensureConciseSegments(projectData.segments || [], 5);
+    // Ensure segments conform to natural singable line lengths (concise, <= 7 words per line)
+    projectData.segments = ensureConciseSegments(projectData.segments || [], 7);
     state.currentProject.segments = projectData.segments;
+    state._memoizedPairs = null;
+    state._memoizedSegsRef = null;
+    state._cachedSongSafeSize = null;
+    state._cachedSongSafeSizeSegsRef = null;
 
     // Populate Editor Table & Lyric Jump Drawer
     renderEditorTable(projectData.segments || []);
@@ -477,26 +1064,39 @@ function loadProjectData(projectData) {
     if (presetToApply === "center") {
         applyLayoutPreset("center", false);
     } else {
-        state.line1PosY = saved.line1_pos_y !== undefined ? parseFloat(saved.line1_pos_y) : (projectData.line1_pos_y !== undefined ? parseFloat(projectData.line1_pos_y) : 0.60);
-        state.line2PosY = saved.line2_pos_y !== undefined ? parseFloat(saved.line2_pos_y) : (projectData.line2_pos_y !== undefined ? parseFloat(projectData.line2_pos_y) : 0.76);
-        state.line1PosX = saved.line1_pos_x !== undefined ? parseFloat(saved.line1_pos_x) : (projectData.line1_pos_x !== undefined ? parseFloat(projectData.line1_pos_x) : 0.08);
-        state.line2PosX = saved.line2_pos_x !== undefined ? parseFloat(saved.line2_pos_x) : (projectData.line2_pos_x !== undefined ? parseFloat(projectData.line2_pos_x) : 0.42);
-        state.fontSizeLine1 = saved.font_size_line1 || projectData.font_size_line1 || 52;
-        state.fontSizeLine2 = saved.font_size_line2 || projectData.font_size_line2 || 52;
-
-        applyLinePositionX(1, state.line1PosX);
-        applyLinePositionX(2, state.line2PosX);
-        applyLinePositionY(1, state.line1PosY);
-        applyLinePositionY(2, state.line2PosY);
-        applyLineFontSize(1, state.fontSizeLine1);
-        applyLineFontSize(2, state.fontSizeLine2);
-        document.getElementById("btnPresetStaggered")?.classList.add("active");
+        applyLayoutPreset("staggered", false);
     }
+
+    const savedSize = saved.font_size_line1 || saved.font_size_line2 || projectData.font_size_line1 || projectData.font_size_line2 || 52;
+    applyMasterFontSize(savedSize);
 
     state.bgTheme = saved.bg_theme || "nebula";
 
     const fontToApply = saved.font_name || projectData.font_name || "'Outfit', sans-serif";
     applyStageFont(fontToApply);
+
+    const savedColor = saved.color_active_hex || "#0018F5";
+    applyStageActiveColor(savedColor);
+
+    state.wipingFxMode = saved.wiping_fx || "smooth";
+    if (typeof applyWipingFxMode === "function") {
+        applyWipingFxMode();
+    }
+
+    state.showCountdownDots = (saved.show_countdown !== undefined) ? !!saved.show_countdown : true;
+    const chkCountdown = document.getElementById("chkCountdownDots");
+    if (chkCountdown) chkCountdown.checked = state.showCountdownDots;
+
+    state.stageDisplayMode = saved.display_mode || saved.stage_display_mode || "pingpong";
+    document.querySelectorAll(".display-mode-btn").forEach(b => {
+        b.classList.toggle("active", b.dataset.mode === state.stageDisplayMode);
+    });
+
+    const savedPitch = (saved.pitch_semitones !== undefined) ? parseInt(saved.pitch_semitones) : 0;
+    if (typeof applyPitchShift === "function") {
+        applyPitchShift(0, savedPitch);
+    }
+    updateExportSummary();
 
     // Reset Player
     beatAudio.currentTime = 0;
@@ -505,11 +1105,8 @@ function loadProjectData(projectData) {
     currentTimeLabel.textContent = "00:00";
     durationLabel.textContent = formatTime(projectData.duration || 0);
 
-    // Initial Stage Text
-    const kLine1Content = document.getElementById("kLine1Content") || kLine1;
-    const kLine2Content = document.getElementById("kLine2Content") || kLine2;
-    kLine1Content.innerHTML = `<span class="line-placeholder">${projectData.title || "Bài Hát Đã Sẵn Sàng"}</span>`;
-    kLine2Content.innerHTML = `<span class="line-placeholder">Nhấn Phát để bắt đầu hát Karaoke</span>`;
+    // Initial Stage: display first couplet preview ready on screen
+    updateKaraokeStage(0);
 }
 
 // State for segment looping
@@ -547,13 +1144,64 @@ function showToastNotification(msg) {
     }, 3000);
 }
 
+// Global alias for notification toast
+window.showToast = showToastNotification;
+
+async function deleteSegment(segIdx) {
+    if (!state.currentProject || !state.currentProject.segments) return;
+    const segments = state.currentProject.segments;
+    if (segIdx < 0 || segIdx >= segments.length) return;
+
+    const removed = segments.splice(segIdx, 1)[0];
+    segments.forEach((s, i) => { s.id = i; });
+
+    state._memoizedPairs = null;
+    state._memoizedSegsRef = null;
+
+    const kLine1 = document.getElementById("kLine1");
+    const kLine2 = document.getElementById("kLine2");
+    if (kLine1) {
+        kLine1.classList.remove("editing-text");
+        kLine1.dataset.segIdx = "";
+    }
+    if (kLine2) {
+        kLine2.classList.remove("editing-text");
+        kLine2.dataset.segIdx = "";
+    }
+
+    renderEditorTable(segments);
+    renderLyricJumpList(segments);
+    updateKaraokeStage(beatAudio.currentTime);
+
+    try {
+        await fetch(`/api/update-lyrics/${state.currentProject.id}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                segments: segments,
+                font_name: state.fontName || "Outfit",
+                font_size: state.fontSizeLine1 || 52
+            })
+        });
+        showToastNotification(`Đã xóa câu #${segIdx + 1} ("${removed.text || 'trống'}") khỏi bài hát!`);
+    } catch (err) {
+        console.error("Delete segment error:", err);
+        showToastNotification(`Lỗi khi lưu bài hát: ${err.message}`);
+    }
+}
+window.deleteSegment = deleteSegment;
+
 async function updateSegmentText(segIdx, newText) {
     if (!state.currentProject || !state.currentProject.segments) return;
     const segments = state.currentProject.segments;
     if (segIdx < 0 || segIdx >= segments.length) return;
 
     const trimmed = (newText || "").trim();
-    if (!trimmed) return;
+    if (!trimmed) {
+        // User erased all text - delete this segment from the song!
+        await deleteSegment(segIdx);
+        return;
+    }
 
     const seg = segments[segIdx];
     seg.text = trimmed;
@@ -576,6 +1224,9 @@ async function updateSegmentText(segIdx, newText) {
             probability: 1.0
         }));
     }
+
+    state._memoizedPairs = null;
+    state._memoizedSegsRef = null;
 
     renderEditorTable(segments);
     renderLyricJumpList(segments);
@@ -608,7 +1259,7 @@ function startDrawerInlineEdit(cardEl, segIdx) {
 
     previewEl.innerHTML = `
         <div class="drawer-inline-edit-wrap">
-            <input type="text" class="drawer-inline-input" value="${seg.text}" />
+            <input type="text" class="drawer-inline-input" value="${seg.text || ''}" placeholder="Nhập lời hoặc xóa hết để xóa câu..." />
             <div class="drawer-inline-actions">
                 <button type="button" class="btn-drawer-save">Lưu</button>
                 <button type="button" class="btn-drawer-cancel">Hủy</button>
@@ -624,10 +1275,10 @@ function startDrawerInlineEdit(cardEl, segIdx) {
         input.focus();
         input.select();
 
-        const doSave = () => {
+        const doSave = async () => {
             const val = input.value;
             cardEl.classList.remove("in-edit-mode");
-            updateSegmentText(segIdx, val);
+            await updateSegmentText(segIdx, val);
         };
 
         const doCancel = () => {
@@ -665,9 +1316,14 @@ function startStageInlineEdit(lineNum) {
     const lineEl = document.getElementById(lineNum === 1 ? "kLine1" : "kLine2");
     if (!lineEl || !state.currentProject || !state.currentProject.segments) return;
 
-    let segIdx = parseInt(lineEl.dataset.segIdx);
-    if (isNaN(segIdx) || segIdx < 0 || segIdx >= state.currentProject.segments.length) {
-        segIdx = lineNum === 1 ? 0 : Math.min(1, state.currentProject.segments.length - 1);
+    let segIdx = state.currentProject.segments.findIndex(s => String(s.id) === String(lineEl.dataset.segIdx));
+    if (segIdx < 0) {
+        const parsed = parseInt(lineEl.dataset.segIdx);
+        if (!isNaN(parsed) && parsed >= 0 && parsed < state.currentProject.segments.length) {
+            segIdx = parsed;
+        } else {
+            segIdx = lineNum === 1 ? 0 : Math.min(1, state.currentProject.segments.length - 1);
+        }
     }
 
     const seg = state.currentProject.segments[segIdx];
@@ -686,9 +1342,10 @@ function startStageInlineEdit(lineNum) {
 
     contentEl.innerHTML = `
         <div class="stage-inline-edit-wrap">
-            <input type="text" class="stage-inline-input" id="stageInlineInput_${lineNum}" value="${seg.text}" />
+            <input type="text" class="stage-inline-input" id="stageInlineInput_${lineNum}" value="${seg.text || ''}" placeholder="Nhập lời mới hoặc để trống để xóa câu..." />
             <div class="stage-inline-actions">
                 <button type="button" class="btn-stage-save" id="btnStageSave_${lineNum}">Lưu</button>
+                <button type="button" class="btn-stage-delete" id="btnStageDelete_${lineNum}" title="Xóa hẳn câu này khỏi bài hát">Xóa câu</button>
                 <button type="button" class="btn-stage-cancel" id="btnStageCancel_${lineNum}">Hủy</button>
             </div>
         </div>
@@ -696,26 +1353,40 @@ function startStageInlineEdit(lineNum) {
 
     const input = document.getElementById(`stageInlineInput_${lineNum}`);
     const btnSave = document.getElementById(`btnStageSave_${lineNum}`);
+    const btnDelete = document.getElementById(`btnStageDelete_${lineNum}`);
     const btnCancel = document.getElementById(`btnStageCancel_${lineNum}`);
 
     if (input) {
         input.focus();
         input.select();
 
-        const doSave = () => {
+        const doSave = async () => {
             const val = input.value;
             lineEl.classList.remove("editing-text");
-            updateSegmentText(segIdx, val);
+            lineEl.dataset.segIdx = "";
+            await updateSegmentText(segIdx, val);
+        };
+
+        const doDelete = async () => {
+            lineEl.classList.remove("editing-text");
+            lineEl.dataset.segIdx = "";
+            await deleteSegment(segIdx);
         };
 
         const doCancel = () => {
             lineEl.classList.remove("editing-text");
+            lineEl.dataset.segIdx = "";
             updateKaraokeStage(beatAudio.currentTime);
         };
 
         btnSave?.addEventListener("click", (e) => {
             e.stopPropagation();
             doSave();
+        });
+
+        btnDelete?.addEventListener("click", (e) => {
+            e.stopPropagation();
+            doDelete();
         });
 
         btnCancel?.addEventListener("click", (e) => {
@@ -762,7 +1433,7 @@ function renderLyricJumpList(segments) {
             <div class="seg-card-top">
                 <div class="seg-badge-group">
                     <span class="seg-idx-pill">Câu #${idx + 1}</span>
-                    <span class="seg-time-pill">${formatTimeMs(seg.start)} ➔ ${formatTimeMs(seg.end)}</span>
+                    <span class="seg-time-pill">${formatTimeMs(seg.start)} - ${formatTimeMs(seg.end)}</span>
                     <span class="seg-dur-pill">(${dur}s)</span>
                     <div class="role-btn-group" style="margin-left: 6px;">
                         <button type="button" class="role-chip role-all ${curRole === 'all' ? 'active' : ''}" onclick="setSegmentRole(${idx}, 'all')" title="Chung">Chung</button>
@@ -933,7 +1604,621 @@ function seekToTime(targetSeconds) {
 }
 
 /* ========================================================
-   5. SYNCHRONIZED KARAOKE PLAYER & STAGE ANIMATION
+   STUDIO PITCH SHIFTER ENGINE (PRESERVES TEMPO / DURATION)
+   Granular delay crossfade technique (Miller Puckette / Chris Wilson)
+   Shifts musical key/pitch (-6 to +6 semitones) with 100% constant tempo.
+   ======================================================== */
+
+function createFadeBuffer(ctx, activeTime, fadeTime) {
+    const length1 = Math.round(activeTime * ctx.sampleRate);
+    const length2 = Math.round(Math.max(0, (activeTime - 2 * fadeTime) * ctx.sampleRate));
+    const length = Math.max(1, length1 + length2);
+    const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+    const p = buffer.getChannelData(0);
+    const fadeLength = Math.round(fadeTime * ctx.sampleRate);
+    const fadeIndex1 = fadeLength;
+    const fadeIndex2 = length1 - fadeLength;
+
+    for (let i = 0; i < length1; ++i) {
+        let value;
+        if (i < fadeIndex1) {
+            value = Math.sqrt(i / Math.max(1, fadeLength));
+        } else if (i >= fadeIndex2) {
+            value = Math.sqrt(Math.max(0, 1 - (i - fadeIndex2) / Math.max(1, fadeLength)));
+        } else {
+            value = 1;
+        }
+        p[i] = value;
+    }
+    for (let i = length1; i < length; ++i) {
+        p[i] = 0;
+    }
+    return buffer;
+}
+
+function createDelayTimeBuffer(ctx, activeTime, fadeTime, shiftUp) {
+    const length1 = Math.round(activeTime * ctx.sampleRate);
+    const length2 = Math.round(Math.max(0, (activeTime - 2 * fadeTime) * ctx.sampleRate));
+    const length = Math.max(1, length1 + length2);
+    const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+    const p = buffer.getChannelData(0);
+
+    for (let i = 0; i < length1; ++i) {
+        if (shiftUp) {
+            p[i] = (length1 - i) / Math.max(1, length);
+        } else {
+            p[i] = i / Math.max(1, length1);
+        }
+    }
+    for (let i = length1; i < length; ++i) {
+        p[i] = 0;
+    }
+    return buffer;
+}
+
+function getPitchMultiplier(x) {
+    if (x < 0) {
+        return x / 12.0;
+    }
+    const a5 = 1.8149080040913423e-7;
+    const a4 = -0.000019413043101157434;
+    const a3 = 0.0009795096626987743;
+    const a2 = -0.014147877819596033;
+    const a1 = 0.23005591195033048;
+    const a0 = 0.02278153473118749;
+    return a0 + x*a1 + (x*x)*a2 + (x*x*x)*a3 + (x*x*x*x)*a4 + (x*x*x*x*x)*a5;
+}
+
+class StudioPitchShifter {
+    constructor(context) {
+        this.context = context;
+        this.input = context.createGain();
+        this.output = context.createGain();
+        this.dryGain = context.createGain();
+        this.wetGain = context.createGain();
+
+        // Default bypass mode (0 semitones)
+        this.dryGain.gain.setValueAtTime(1.0, context.currentTime);
+        this.wetGain.gain.setValueAtTime(0.0, context.currentTime);
+
+        const delayTime = 0.100;
+        const fadeTime = 0.050;
+        const bufferTime = 0.100;
+
+        const mod1 = context.createBufferSource();
+        const mod2 = context.createBufferSource();
+        const mod3 = context.createBufferSource();
+        const mod4 = context.createBufferSource();
+
+        const shiftDownBuffer = createDelayTimeBuffer(context, bufferTime, fadeTime, false);
+        const shiftUpBuffer = createDelayTimeBuffer(context, bufferTime, fadeTime, true);
+
+        mod1.buffer = shiftDownBuffer;
+        mod2.buffer = shiftDownBuffer;
+        mod3.buffer = shiftUpBuffer;
+        mod4.buffer = shiftUpBuffer;
+
+        mod1.loop = true;
+        mod2.loop = true;
+        mod3.loop = true;
+        mod4.loop = true;
+
+        const mod1Gain = context.createGain();
+        const mod2Gain = context.createGain();
+        const mod3Gain = context.createGain();
+        const mod4Gain = context.createGain();
+
+        mod3Gain.gain.setValueAtTime(0, context.currentTime);
+        mod4Gain.gain.setValueAtTime(0, context.currentTime);
+
+        mod1.connect(mod1Gain);
+        mod2.connect(mod2Gain);
+        mod3.connect(mod3Gain);
+        mod4.connect(mod4Gain);
+
+        const modGain1 = context.createGain();
+        const modGain2 = context.createGain();
+
+        const delay1 = context.createDelay(1.0);
+        const delay2 = context.createDelay(1.0);
+
+        mod1Gain.connect(modGain1);
+        mod2Gain.connect(modGain2);
+        mod3Gain.connect(modGain1);
+        mod4Gain.connect(modGain2);
+
+        modGain1.connect(delay1.delayTime);
+        modGain2.connect(delay2.delayTime);
+
+        const fade1 = context.createBufferSource();
+        const fade2 = context.createBufferSource();
+        const fadeBuffer = createFadeBuffer(context, bufferTime, fadeTime);
+        fade1.buffer = fadeBuffer;
+        fade2.buffer = fadeBuffer;
+        fade1.loop = true;
+        fade2.loop = true;
+
+        const mix1 = context.createGain();
+        const mix2 = context.createGain();
+        mix1.gain.setValueAtTime(0, context.currentTime);
+        mix2.gain.setValueAtTime(0, context.currentTime);
+
+        fade1.connect(mix1.gain);
+        fade2.connect(mix2.gain);
+
+        const wetInput = context.createGain();
+        wetInput.connect(delay1);
+        wetInput.connect(delay2);
+        delay1.connect(mix1);
+        delay2.connect(mix2);
+        mix1.connect(this.output);
+        mix2.connect(this.output);
+
+        this.input.connect(this.dryGain);
+        this.dryGain.connect(this.output);
+
+        this.input.connect(this.wetGain);
+        this.wetGain.connect(wetInput);
+
+        const t = context.currentTime + 0.050;
+        const t2 = t + bufferTime - fadeTime;
+        mod1.start(t);
+        mod2.start(t2);
+        mod3.start(t);
+        mod4.start(t2);
+        fade1.start(t);
+        fade2.start(t2);
+
+        this.mod1Gain = mod1Gain;
+        this.mod2Gain = mod2Gain;
+        this.mod3Gain = mod3Gain;
+        this.mod4Gain = mod4Gain;
+        this.modGain1 = modGain1;
+        this.modGain2 = modGain2;
+        this.delayTime = delayTime;
+    }
+
+    setTranspose(semitones) {
+        const now = this.context.currentTime;
+        if (semitones === 0) {
+            // Bypass mode: pure uncolored dry audio, zero delay, zero DSP
+            this.dryGain.gain.setTargetAtTime(1.0, now, 0.020);
+            this.wetGain.gain.setTargetAtTime(0.0, now, 0.020);
+        } else {
+            const mult = getPitchMultiplier(semitones);
+            if (mult > 0) {
+                this.mod1Gain.gain.setValueAtTime(0, now);
+                this.mod2Gain.gain.setValueAtTime(0, now);
+                this.mod3Gain.gain.setValueAtTime(1, now);
+                this.mod4Gain.gain.setValueAtTime(1, now);
+            } else {
+                this.mod1Gain.gain.setValueAtTime(1, now);
+                this.mod2Gain.gain.setValueAtTime(1, now);
+                this.mod3Gain.gain.setValueAtTime(0, now);
+                this.mod4Gain.gain.setValueAtTime(0, now);
+            }
+            const dt = this.delayTime * Math.abs(mult);
+            this.modGain1.gain.setTargetAtTime(0.5 * dt, now, 0.010);
+            this.modGain2.gain.setTargetAtTime(0.5 * dt, now, 0.010);
+
+            this.dryGain.gain.setTargetAtTime(0.0, now, 0.020);
+            this.wetGain.gain.setTargetAtTime(1.0, now, 0.020);
+        }
+    }
+}
+
+let studioAudioCtx = null;
+let studioBeatSource = null;
+let studioVocalSource = null;
+let studioPitchShifter = null;
+
+async function initOrResumeStudioAudio() {
+    try {
+        if (!studioAudioCtx) {
+            studioAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            state.audioContext = studioAudioCtx;
+        }
+        if (studioAudioCtx.state === "suspended") {
+            await studioAudioCtx.resume();
+        }
+        if (!studioBeatSource) {
+            beatAudio.crossOrigin = "anonymous";
+            vocalAudio.crossOrigin = "anonymous";
+
+            studioBeatSource = studioAudioCtx.createMediaElementSource(beatAudio);
+            studioVocalSource = studioAudioCtx.createMediaElementSource(vocalAudio);
+
+            studioPitchShifter = new StudioPitchShifter(studioAudioCtx);
+
+            studioBeatSource.connect(studioPitchShifter.input);
+            studioVocalSource.connect(studioPitchShifter.input);
+
+            studioPitchShifter.output.connect(studioAudioCtx.destination);
+
+            if (state.currentPitchSemitones) {
+                studioPitchShifter.setTranspose(state.currentPitchSemitones);
+            }
+        }
+    } catch (e) {
+        console.warn("Studio audio graph setup note:", e);
+    }
+}
+
+function applyPitchShift(delta, directValue = null) {
+    if (directValue !== null) {
+        state.currentPitchSemitones = Math.max(-6, Math.min(6, directValue));
+    } else if (delta === 0) {
+        state.currentPitchSemitones = 0;
+    } else {
+        state.currentPitchSemitones = Math.max(-6, Math.min(6, (state.currentPitchSemitones || 0) + delta));
+    }
+    const currentPitch = state.currentPitchSemitones || 0;
+    const pitchValText = document.getElementById("pitchValText");
+    if (pitchValText) {
+        if (currentPitch === 0) {
+            pitchValText.textContent = "0";
+        } else {
+            pitchValText.textContent = `${currentPitch > 0 ? '+' : ''}${currentPitch}`;
+        }
+    }
+
+    // CRITICAL: Ensure playbackRate is STRICTLY 1.0 (tempo NEVER changes!)
+    try {
+        beatAudio.preservesPitch = true;
+        beatAudio.playbackRate = 1.0;
+        vocalAudio.preservesPitch = true;
+        vocalAudio.playbackRate = 1.0;
+    } catch (e) {}
+
+    // Apply granular pitch shifting without tempo alteration
+    initOrResumeStudioAudio().then(() => {
+        if (studioPitchShifter) {
+            studioPitchShifter.setTranspose(currentPitch);
+        }
+    });
+
+    if (typeof updateExportSummary === "function") {
+        updateExportSummary();
+    }
+    if (typeof saveProjectStageSettings === "function") {
+        saveProjectStageSettings();
+    }
+}
+
+/* ========================================================
+   5. UNIFIED STUDIO INSPECTOR & MODULAR DECK ENGINE
+   ======================================================== */
+function openInspectorPane(paneId) {
+    const container = document.getElementById("stageInspectorContainer") || document.getElementById("studioInspectorDrawer");
+    if (!container) return;
+    const targetPane = document.getElementById(paneId);
+    if (!targetPane) return;
+
+    // If clicking currently open pane, toggle closed
+    const isCurrentlyOpen = (container.style.display !== "none" && targetPane.style.display !== "none");
+    if (isCurrentlyOpen) {
+        closeInspector();
+        return;
+    }
+
+    container.style.display = "block";
+    document.querySelectorAll(".inspector-tab-pane").forEach(p => p.style.display = "none");
+    targetPane.style.display = "block";
+
+    // Set tab trigger active
+    document.querySelectorAll(".btn-tab-trigger").forEach(btn => {
+        btn.classList.toggle("active", btn.getAttribute("data-pane") === paneId);
+    });
+
+    // Update btnToggleProTools label
+    const btnToggleProTools = document.getElementById("btnToggleProTools");
+    if (btnToggleProTools) {
+        btnToggleProTools.classList.add("active");
+        btnToggleProTools.textContent = "Đóng Tùy Biến ▲";
+    }
+
+    // Update Header Title
+    const headerTitle = document.getElementById("inspectorHeaderTitle");
+    if (paneId === "paneTypography") {
+        if (headerTitle) headerTitle.textContent = "Phông Chữ & Cỡ Chữ";
+    } else if (paneId === "paneColors") {
+        if (headerTitle) headerTitle.textContent = "Màu Sắc Lời Hát Karaoke & Hiệu Ứng";
+    } else if (paneId === "paneBackground") {
+        if (headerTitle) headerTitle.textContent = "Hình Nền Sân Khấu";
+    } else if (paneId === "panePosition") {
+        if (headerTitle) headerTitle.textContent = "Vị Trí & Ma Trận 9 Điểm";
+    } else if (paneId === "paneLyricJump") {
+        if (headerTitle) headerTitle.textContent = "Canh Nhịp Từng Câu";
+        if (typeof renderLyricJumpList === "function" && state.currentProject?.segments) {
+            renderLyricJumpList(state.currentProject.segments);
+        }
+    } else if (paneId === "paneExport") {
+        if (headerTitle) headerTitle.textContent = "Xuất Video MP4 (GPU NVENC) & Tải Về";
+        if (typeof updateExportSummary === "function") {
+            updateExportSummary();
+        }
+    }
+
+    // Scroll into view
+    setTimeout(() => {
+        container.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }, 50);
+
+    // Sync Guided Stepper
+    if (typeof syncGuidedStepper === "function") {
+        syncGuidedStepper("playerTab", paneId === "paneExport");
+    }
+}
+
+function closeInspector() {
+    const container = document.getElementById("stageInspectorContainer") || document.getElementById("studioInspectorDrawer");
+    if (container) container.style.display = "none";
+    document.querySelectorAll(".inspector-tab-pane").forEach(p => p.style.display = "none");
+    document.querySelectorAll(".btn-tab-trigger").forEach(btn => btn.classList.remove("active"));
+    
+    const btnToggleProTools = document.getElementById("btnToggleProTools");
+    if (btnToggleProTools) {
+        btnToggleProTools.classList.remove("active");
+        btnToggleProTools.textContent = "Tùy Biến Nâng Cao ▼";
+    }
+
+    if (typeof syncGuidedStepper === "function") {
+        syncGuidedStepper("playerTab", false);
+    }
+}
+
+window.openInspectorPane = openInspectorPane;
+window.closeInspector = closeInspector;
+
+function initStudioInspector() {
+    // Tab Buttons in Studio Action Dock
+    document.querySelectorAll(".btn-tab-trigger").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const paneId = btn.getAttribute("data-pane");
+            if (paneId) openInspectorPane(paneId);
+        });
+    });
+
+    // Close Inspector Button
+    document.getElementById("btnCloseInspector")?.addEventListener("click", closeInspector);
+
+    // Master Font Size Slider (Pane Typography)
+    const masterSlider = document.getElementById("masterFontSizeSlider");
+    masterSlider?.addEventListener("input", (e) => {
+        applyMasterFontSize(e.target.value);
+    });
+
+    document.getElementById("btnMasterZoomIn")?.addEventListener("click", () => {
+        const cur = parseInt(document.getElementById("masterFontSizeSlider")?.value || state.fontSizeLine1 || 52);
+        applyMasterFontSize(cur + 4);
+    });
+
+    document.getElementById("btnMasterZoomOut")?.addEventListener("click", () => {
+        const cur = parseInt(document.getElementById("masterFontSizeSlider")?.value || state.fontSizeLine1 || 52);
+        applyMasterFontSize(cur - 4);
+    });
+
+    // Size Preset Pills (36, 44, 52, 68, 84)
+    document.querySelectorAll(".size-preset-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const sz = parseInt(btn.dataset.size);
+            if (sz) applyMasterFontSize(sz);
+        });
+    });
+
+    // Global Safe Size Button (Scan whole song)
+    document.getElementById("btnGlobalSafeSize")?.addEventListener("click", () => {
+        if (typeof calculateGlobalMaxSafeFontSize === "function") {
+            calculateGlobalMaxSafeFontSize(true);
+        }
+    });
+
+    // Background preset chips in Pane Background
+    document.querySelectorAll(".bg-preset-chips .bg-chip").forEach(chip => {
+        chip.addEventListener("click", () => {
+            const bgType = chip.getAttribute("data-bg");
+            const stageScreen = document.getElementById("stageScreen") || document.getElementById("karaokeScreen");
+            document.querySelectorAll(".bg-preset-chips .bg-chip").forEach(c => c.classList.remove("active"));
+            chip.classList.add("active");
+            if (stageScreen && bgType) {
+                const existingMedia = stageScreen.querySelector(".stage-screen-bg-media");
+                if (existingMedia) existingMedia.remove();
+                stageScreen.className = "stage-screen";
+                stageScreen.classList.add(`bg-${bgType}`);
+            }
+        });
+    });
+
+    // Color chips in Pane Background
+    document.querySelectorAll(".stage-color-chips-row .drawer-color-chip").forEach(chip => {
+        chip.addEventListener("click", () => {
+            const color = chip.getAttribute("data-color");
+            if (color && typeof applyStageActiveColor === "function") {
+                applyStageActiveColor(color);
+            }
+        });
+    });
+
+    const drawerColorPicker = document.getElementById("drawerColorPickerInput");
+    drawerColorPicker?.addEventListener("input", (e) => {
+        if (e.target.value && typeof applyStageActiveColor === "function") {
+            applyStageActiveColor(e.target.value);
+        }
+    });
+
+    // Preset color buttons in paneColors
+    document.getElementById("btnColorPresetTrongHieu")?.addEventListener("click", () => {
+        if (typeof applyStageActiveColor === "function") {
+            applyStageActiveColor("#0018F5");
+            showToastNotification("Đã chọn màu: Xanh Chuẩn KTV Trọng Hiếu (#0018F5)!");
+        }
+    });
+    document.getElementById("btnColorPresetGold")?.addEventListener("click", () => {
+        if (typeof applyStageActiveColor === "function") {
+            applyStageActiveColor("#FFE259");
+            showToastNotification("Đã chọn màu: Vàng Gold Bolero (#FFE259)!");
+        }
+    });
+    document.getElementById("btnColorPresetCyan")?.addEventListener("click", () => {
+        if (typeof applyStageActiveColor === "function") {
+            applyStageActiveColor("#00F2FE");
+            showToastNotification("Đã chọn màu: Cyber Cyan (#00F2FE)!");
+        }
+    });
+    document.getElementById("btnColorPresetPink")?.addEventListener("click", () => {
+        if (typeof applyStageActiveColor === "function") {
+            applyStageActiveColor("#FF758C");
+            showToastNotification("Đã chọn màu: Hồng Neon Pop (#FF758C)!");
+        }
+    });
+
+    // Visual Wiping FX Mode Switcher (Tia Sáng Comet, Quét Mượt, Nảy Nhịp Bounce)
+    document.querySelectorAll(".fx-style-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            document.querySelectorAll(".fx-style-btn").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            state.wipingFxMode = btn.dataset.fx || "smooth";
+            applyWipingFxMode();
+            saveProjectStageSettings();
+            showToastNotification(`Đã chuyển hiệu ứng: ${btn.textContent.trim()}`);
+        });
+    });
+
+    // Subtitle Display Mode Switcher (So Le Luân Phiên Ping-Pong vs Cặp Câu Đồng Thời Couplet)
+    document.querySelectorAll(".display-mode-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            document.querySelectorAll(".display-mode-btn").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            state.stageDisplayMode = btn.dataset.mode || "pingpong";
+            state._memoizedTimeline = null;
+            state._memoizedTimelineSegsRef = null;
+            updateKaraokeStage(beatAudio.currentTime);
+            saveProjectStageSettings();
+            showToastNotification(`Đã chuyển chế độ hiển thị: ${btn.textContent.trim()}`);
+        });
+    });
+
+    // Lead-in Countdown Dots Toggle
+    const chkCountdown = document.getElementById("chkCountdownDots");
+    chkCountdown?.addEventListener("change", (e) => {
+        state.showCountdownDots = e.target.checked;
+        saveProjectStageSettings();
+        showToastNotification(state.showCountdownDots ? "Đã bật chấm đếm nhịp vào câu" : "Đã tắt chấm đếm nhịp vào câu");
+    });
+
+    applyWipingFxMode();
+}
+
+function applyWipingFxMode() {
+    const stage = document.getElementById("karaokeStage") || document.getElementById("stageScreen");
+    if (!stage) return;
+    stage.classList.remove("fx-mode-comet", "fx-mode-smooth", "fx-mode-bounce");
+    const mode = state.wipingFxMode || "smooth";
+    stage.classList.add(`fx-mode-${mode}`);
+
+    document.querySelectorAll(".fx-style-btn").forEach(b => {
+        b.classList.toggle("active", b.dataset.fx === mode);
+    });
+}
+
+function initTimingSyncPopover() {
+    const btnToggle = document.getElementById("btnToggleSyncPopover");
+    const popover = document.getElementById("syncPopoverMenu");
+    const caret = document.getElementById("syncCaret");
+
+    btnToggle?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (!popover) return;
+        const isHidden = popover.style.display === "none" || !popover.style.display;
+        popover.style.display = isHidden ? "block" : "none";
+        btnToggle.classList.toggle("active", isHidden);
+        if (caret) caret.style.transform = isHidden ? "rotate(180deg)" : "rotate(0deg)";
+    });
+
+    document.addEventListener("click", (e) => {
+        if (popover && popover.style.display !== "none") {
+            if (!popover.contains(e.target) && !btnToggle?.contains(e.target)) {
+                popover.style.display = "none";
+                btnToggle?.classList.remove("active");
+                if (caret) caret.style.transform = "rotate(0deg)";
+            }
+        }
+    });
+}
+
+function initMasterQuickActions() {
+    // 1. Toggle Pro Tools Dock
+    const btnToggleProTools = document.getElementById("btnToggleProTools");
+    const studioActionDock = document.getElementById("studioActionDock");
+    if (btnToggleProTools && studioActionDock) {
+        btnToggleProTools.addEventListener("click", () => {
+            const isHidden = studioActionDock.classList.contains("dock-hidden") || studioActionDock.style.display === "none";
+            if (isHidden) {
+                studioActionDock.classList.remove("dock-hidden");
+                studioActionDock.style.display = "flex";
+                btnToggleProTools.classList.add("active");
+                btnToggleProTools.textContent = "Tùy Biến Nâng Cao ▲";
+                showToastNotification("Đã mở Bảng tùy biến nâng cao (Phông chữ, vị trí, căn lề)");
+            } else {
+                studioActionDock.classList.add("dock-hidden");
+                studioActionDock.style.display = "none";
+                btnToggleProTools.classList.remove("active");
+                btnToggleProTools.textContent = "Tùy Biến Nâng Cao ▼";
+                if (typeof closeInspector === "function") {
+                    closeInspector();
+                }
+            }
+        });
+    }
+
+    // 2. Toggle Mic from Master Strip
+    const btnToggleMicMaster = document.getElementById("btnToggleMicMaster");
+    const micDeck = document.getElementById("studioMicDeckCard");
+    const btnToggleMic = document.getElementById("btnToggleMic");
+    btnToggleMicMaster?.addEventListener("click", () => {
+        if (!micDeck) return;
+        const isHidden = micDeck.style.display === "none" || !micDeck.style.display;
+        if (isHidden) {
+            micDeck.style.display = "block";
+            btnToggleMicMaster.classList.add("active");
+            btnToggleMicMaster.textContent = "Tắt Micro";
+            if (!micStream && btnToggleMic) {
+                btnToggleMic.click();
+            }
+            micDeck.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        } else {
+            if (micStream && btnToggleMic) {
+                btnToggleMic.click();
+            }
+            micDeck.style.display = "none";
+            btnToggleMicMaster.classList.remove("active");
+            btnToggleMicMaster.textContent = "Bật Micro";
+        }
+    });
+
+    // 3. Cinema Master Toggle
+    const btnCinemaMaster = document.getElementById("btnCinemaMaster");
+    const btnToggleCinema = document.getElementById("btnToggleCinema");
+    btnCinemaMaster?.addEventListener("click", () => {
+        if (btnToggleCinema) {
+            btnToggleCinema.click();
+        } else {
+            const stageWrapper = document.querySelector(".karaoke-stage-wrapper") || document.querySelector(".studio-main-col") || document.body;
+            const isCinema = stageWrapper.classList.toggle("cinema-active");
+            btnCinemaMaster.classList.toggle("active", isCinema);
+            btnCinemaMaster.textContent = isCinema ? "Thoát Rạp" : "Rạp Chiếu";
+        }
+    });
+
+    // 4. Quick Export Master Jump
+    const btnExportMaster = document.getElementById("btnExportMaster");
+    btnExportMaster?.addEventListener("click", () => {
+        scrollToStudioExport();
+    });
+}
+
+/* ========================================================
+   6. SYNCHRONIZED KARAOKE PLAYER & STAGE ANIMATION
    ======================================================== */
 function setupPlayer() {
     btnPlayPause.addEventListener("click", togglePlayPause);
@@ -966,26 +2251,10 @@ function setupPlayer() {
     trackSeekBar.addEventListener("mouseup", () => { isDraggingSeek = false; });
     trackSeekBar.addEventListener("touchend", () => { isDraggingSeek = false; });
 
-    // Studio Sub-Dock Navigation Toolbar Hooks
-    const btnToggleLyricJump = document.getElementById("btnToggleLyricJump");
-    const lyricJumpDrawer = document.getElementById("lyricJumpDrawer");
-    btnToggleLyricJump?.addEventListener("click", () => {
-        if (lyricJumpDrawer) {
-            const isHidden = lyricJumpDrawer.style.display === "none";
-            lyricJumpDrawer.style.display = isHidden ? "flex" : "none";
-            btnToggleLyricJump.classList.toggle("active", isHidden);
-        }
-    });
-
-    const btnToggleVisualCustomizer = document.getElementById("btnToggleVisualCustomizer");
-    const stageCustomizerDrawer = document.getElementById("stageCustomizerDrawer");
-    btnToggleVisualCustomizer?.addEventListener("click", () => {
-        if (stageCustomizerDrawer) {
-            const isHidden = stageCustomizerDrawer.style.display === "none";
-            stageCustomizerDrawer.style.display = isHidden ? "block" : "none";
-            btnToggleVisualCustomizer.classList.toggle("active", isHidden);
-        }
-    });
+    // Studio Modular Deck Inspector & Popover Initializations
+    initStudioInspector();
+    initTimingSyncPopover();
+    initMasterQuickActions();
 
     const btnGoToEditor = document.getElementById("btnGoToEditor");
     btnGoToEditor?.addEventListener("click", () => {
@@ -1010,45 +2279,14 @@ function setupPlayer() {
         vocalVolText.textContent = `${Math.round(val * 100)}%`;
     });
 
-    // Key Pitch Transpose (-6 to +6 semitones)
-    let currentPitchSemitones = 0;
+    // Key Pitch Transpose (-6 to +6 semitones, 100% constant tempo)
     const btnPitchDown = document.getElementById("btnPitchDown");
     const btnPitchUp = document.getElementById("btnPitchUp");
     const btnPitchReset = document.getElementById("btnPitchReset");
-    const pitchValText = document.getElementById("pitchValText");
-
-    function applyPitchShift(semitones) {
-        currentPitchSemitones = Math.max(-6, Math.min(6, currentPitchSemitones + semitones));
-        if (pitchValText) {
-            if (currentPitchSemitones === 0) {
-                pitchValText.textContent = "Gốc (0)";
-            } else {
-                pitchValText.textContent = `${currentPitchSemitones > 0 ? '+' : ''}${currentPitchSemitones} Tone`;
-            }
-        }
-        // HTML5 Audio playbackRate pitch shifting (preservesPitch = false)
-        const rate = Math.pow(2, currentPitchSemitones / 12);
-        try {
-            beatAudio.preservesPitch = false;
-            beatAudio.mozPreservesPitch = false;
-            beatAudio.webkitPreservesPitch = false;
-            beatAudio.playbackRate = rate;
-
-            vocalAudio.preservesPitch = false;
-            vocalAudio.mozPreservesPitch = false;
-            vocalAudio.webkitPreservesPitch = false;
-            vocalAudio.playbackRate = rate;
-        } catch (err) {
-            console.error("Pitch shift error:", err);
-        }
-    }
 
     btnPitchDown?.addEventListener("click", () => applyPitchShift(-1));
     btnPitchUp?.addEventListener("click", () => applyPitchShift(1));
-    btnPitchReset?.addEventListener("click", () => {
-        currentPitchSemitones = 0;
-        applyPitchShift(0);
-    });
+    btnPitchReset?.addEventListener("click", () => applyPitchShift(0));
 
     // Time Update Sync
     beatAudio.addEventListener("timeupdate", () => {
@@ -1067,7 +2305,7 @@ function setupPlayer() {
         }
 
         // Highlight active item in Lyric Jump list
-        const jumpItems = document.querySelectorAll(".lyric-jump-item");
+        const jumpItems = document.querySelectorAll(".lyric-jump-item, .segment-sync-card");
         jumpItems.forEach(item => {
             const itemTime = parseFloat(item.dataset.start);
             if (cur >= itemTime && cur < (itemTime + 4.5)) {
@@ -1081,8 +2319,35 @@ function setupPlayer() {
         updateKaraokeStage(cur);
     });
 
+    // 60 FPS Smooth Stage Render Loop (High-speed zero-latency progressive fill)
+    let stageAnimFrameId = null;
+    function stageRenderLoop() {
+        if (!beatAudio.paused && !beatAudio.ended) {
+            updateKaraokeStage(beatAudio.currentTime);
+            stageAnimFrameId = requestAnimationFrame(stageRenderLoop);
+        } else {
+            stageAnimFrameId = null;
+        }
+    }
+
+    beatAudio.addEventListener("play", () => {
+        if (stageAnimFrameId) cancelAnimationFrame(stageAnimFrameId);
+        stageAnimFrameId = requestAnimationFrame(stageRenderLoop);
+    });
+
+    beatAudio.addEventListener("pause", () => {
+        if (stageAnimFrameId) {
+            cancelAnimationFrame(stageAnimFrameId);
+            stageAnimFrameId = null;
+        }
+    });
+
     beatAudio.addEventListener("ended", () => {
         state.isPlaying = false;
+        if (stageAnimFrameId) {
+            cancelAnimationFrame(stageAnimFrameId);
+            stageAnimFrameId = null;
+        }
         playIcon.style.display = "block";
         pauseIcon.style.display = "none";
     });
@@ -1155,6 +2420,86 @@ function setupPlayer() {
     btnSaveOffset?.addEventListener("click", () => {
         handleSaveLyrics();
     });
+
+    const btnStudioRealign = document.getElementById("btnStudioRealign");
+    btnStudioRealign?.addEventListener("click", async () => {
+        if (!state.currentProject) {
+            alert("Chưa có bài hát nào được mở trong Studio!");
+            return;
+        }
+        const projId = state.currentProject.id;
+        const btn = btnStudioRealign;
+        const origHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = `<span class="realign-symbol">↻</span> Đang Căn Lại...`;
+
+        try {
+            const resp = await fetch(`/api/projects/${projId}/realign`, { method: "POST" });
+            const data = await resp.json();
+            if (resp.ok && data.status === "success") {
+                state.currentProject = data.data;
+                state._memoizedPairs = null;
+                state._memoizedSegsRef = null;
+                if (typeof renderLyricJumpList === "function") {
+                    renderLyricJumpList();
+                }
+                if (typeof renderLyricsEditor === "function") {
+                    renderLyricsEditor();
+                }
+                showToastNotification("Đã tự động căn lại nhịp và ghép cặp câu KTV thành công!");
+            } else {
+                alert("Lỗi căn nhịp: " + (data.detail || data.message || "Không xác định"));
+            }
+        } catch (err) {
+            console.error("Realign error:", err);
+            alert("Lỗi kết nối khi căn lại nhịp: " + err.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+        }
+    });
+
+    const btnSplitLongSegments = document.getElementById("btnSplitLongSegments");
+    btnSplitLongSegments?.addEventListener("click", async () => {
+        if (!state.currentProject) {
+            alert("Chưa có bài hát nào được mở trong Studio!");
+            return;
+        }
+        const projId = state.currentProject.id;
+        const btn = btnSplitLongSegments;
+        const origHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = `<span class="realign-symbol">↻</span> Đang Tách...`;
+
+        try {
+            const resp = await fetch(`/api/split-long-segments/${projId}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ max_words: 7 })
+            });
+            const data = await resp.json();
+            if (resp.ok && data.status === "success") {
+                state.currentProject.segments = data.segments;
+                state._memoizedPairs = null;
+                state._memoizedSegsRef = null;
+                if (typeof renderLyricJumpList === "function") {
+                    renderLyricJumpList(data.segments);
+                }
+                if (typeof renderEditorTable === "function") {
+                    renderEditorTable(data.segments);
+                }
+                showToastNotification(`Đã chia nhỏ các câu dài thành ${data.segments.length} câu ngắn (≤7 chữ)!`);
+            } else {
+                alert("Lỗi tách câu: " + (data.detail || data.message || "Không xác định"));
+            }
+        } catch (err) {
+            console.error("Split error:", err);
+            alert("Lỗi kết nối khi tách câu: " + err.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+        }
+    });
 }
 
 function togglePlayPause() {
@@ -1171,12 +2516,20 @@ function togglePlayPause() {
         state.isPlaying = false;
         if (playIconText) playIconText.textContent = "Phát";
     } else {
-        beatAudio.play().then(() => {
-            vocalAudio.play();
-            state.isPlaying = true;
-            if (playIconText) playIconText.textContent = "Tạm dừng";
-        }).catch(err => {
-            console.error("Playback error:", err);
+        initOrResumeStudioAudio().then(() => {
+            // Guarantee playback speed is strictly 1.0 (constant tempo)
+            beatAudio.playbackRate = 1.0;
+            vocalAudio.playbackRate = 1.0;
+            beatAudio.preservesPitch = true;
+            vocalAudio.preservesPitch = true;
+
+            beatAudio.play().then(() => {
+                vocalAudio.play();
+                state.isPlaying = true;
+                if (playIconText) playIconText.textContent = "Tạm dừng";
+            }).catch(err => {
+                console.error("Playback error:", err);
+            });
         });
     }
 }
@@ -1195,6 +2548,8 @@ function seekRelative(delta) {
 function applyStageFont(fontFamily) {
     if (!fontFamily) return;
     state.fontName = fontFamily;
+    state._cachedSongSafeSize = null;
+    state._cachedSongSafeSizeSegsRef = null;
 
     const kLine1 = document.getElementById("kLine1");
     const kLine2 = document.getElementById("kLine2");
@@ -1206,7 +2561,7 @@ function applyStageFont(fontFamily) {
     if (kLine1Content) kLine1Content.style.fontFamily = fontFamily;
     if (kLine2Content) kLine2Content.style.fontFamily = fontFamily;
 
-    document.querySelectorAll(".draggable-karaoke-line, .draggable-karaoke-line .line-content, .k-word, .line-placeholder").forEach(el => {
+    document.querySelectorAll(".draggable-karaoke-line, .draggable-karaoke-line .line-content, .k-word, .k-word-wrap, .k-word-base, .k-word-fill-inner, .line-placeholder").forEach(el => {
         el.style.fontFamily = fontFamily;
     });
 
@@ -1215,15 +2570,17 @@ function applyStageFont(fontFamily) {
         stageFontSelect.value = fontFamily;
     }
 
-    const exportFontSelect = document.getElementById("fontSelect");
-    if (exportFontSelect && exportFontSelect.value !== fontFamily) {
+    const exportFontSelect = document.getElementById("exportFontSelect") || document.getElementById("fontSelect");
+    if (exportFontSelect) {
+        const cleanFont = fontFamily.split(",")[0].replace(/['"]/g, "").trim();
         for (let opt of exportFontSelect.options) {
-            if (opt.value === fontFamily) {
-                exportFontSelect.value = fontFamily;
+            if (opt.value === fontFamily || opt.value === cleanFont) {
+                exportFontSelect.value = opt.value;
                 break;
             }
         }
     }
+    updateExportSummary();
 }
 
 function applyLinePositionX(lineNum, posXFraction) {
@@ -1231,36 +2588,64 @@ function applyLinePositionX(lineNum, posXFraction) {
     const lineEl = document.getElementById(lineNum === 1 ? "kLine1" : "kLine2");
     if (!stageScreen || !lineEl) return;
 
-    const clamped = Math.max(0.02, Math.min(0.85, parseFloat(posXFraction)));
+    const clamped = Math.max(0.02, Math.min(0.98, parseFloat(posXFraction)));
     if (lineNum === 1) state.line1PosX = clamped;
     else state.line2PosX = clamped;
 
     const isCenter = Math.abs(clamped - 0.50) < 0.04;
+    const isRight = (lineNum === 2 && state.layoutPreset === "staggered") || (clamped >= 0.78);
+
     if (isCenter) {
         lineEl.classList.add("align-center");
+        lineEl.classList.remove("align-right");
         lineEl.dataset.align = "center";
         lineEl.style.left = "50%";
+        lineEl.style.right = "auto";
+        lineEl.style.transform = "translateX(-50%)";
+        lineEl.style.textAlign = "center";
+    } else if (isRight) {
+        lineEl.classList.remove("align-center");
+        lineEl.classList.add("align-right");
+        lineEl.dataset.align = "right";
+        lineEl.style.left = "auto";
+        const rightPct = Math.max(4, Math.min(30, Math.round((1.0 - clamped) * 100)));
+        lineEl.style.right = `${rightPct}%`;
+        lineEl.style.transform = "none";
+        lineEl.style.textAlign = "right";
     } else {
         lineEl.classList.remove("align-center");
-        delete lineEl.dataset.align;
+        lineEl.classList.remove("align-right");
+        lineEl.dataset.align = "left";
+        lineEl.style.right = "auto";
+        lineEl.style.transform = "none";
+        lineEl.style.textAlign = "left";
         const stageW = stageScreen.clientWidth || 800;
         const lineW = lineEl.clientWidth || 200;
-        const maxLeft = Math.max(20, stageW - lineW - 20);
-        const targetLeft = Math.max(10, Math.min(maxLeft, stageW * clamped));
+        const safeMargin = 28;
+        const maxLeft = Math.max(safeMargin, stageW - lineW - safeMargin);
+        const targetLeft = Math.max(safeMargin, Math.min(maxLeft, stageW * clamped));
         lineEl.style.left = `${targetLeft}px`;
     }
 
     const textEl = document.getElementById(lineNum === 1 ? "stagePosX1Text" : "stagePosX2Text");
     const sliderEl = document.getElementById(lineNum === 1 ? "stagePosX1Slider" : "stagePosX2Slider");
     const pctX = Math.round(clamped * 100);
-    if (textEl) textEl.textContent = isCenter ? "50% (Giữa)" : `${pctX}%`;
+    if (textEl) {
+        if (isCenter) textEl.textContent = "50% (Giữa)";
+        else if (isRight) textEl.textContent = `${pctX}% (Phải)`;
+        else textEl.textContent = `${pctX}% (Trái)`;
+    }
     if (sliderEl) sliderEl.value = pctX;
 
     // Update Floating HUD Badge position label
     const hudPosEl = document.getElementById(lineNum === 1 ? "kLine1HudPos" : "kLine2HudPos");
     const curY = lineNum === 1 ? (state.line1PosY || 0.60) : (state.line2PosY || 0.76);
     const pctY = Math.round(curY * 100);
-    if (hudPosEl) hudPosEl.textContent = isCenter ? `Giữa (50%) • Y: ${pctY}%` : `X: ${pctX}% Y: ${pctY}%`;
+    if (hudPosEl) {
+        if (isCenter) hudPosEl.textContent = `Giữa (50%) • Y: ${pctY}%`;
+        else if (isRight) hudPosEl.textContent = `Phải (${pctX}%) • Y: ${pctY}%`;
+        else hudPosEl.textContent = `X: ${pctX}% • Y: ${pctY}%`;
+    }
 
     const btnSelector = lineNum === 1 ? ".posX1-btn" : ".posX2-btn";
     document.querySelectorAll(btnSelector).forEach(btn => {
@@ -1269,7 +2654,7 @@ function applyLinePositionX(lineNum, posXFraction) {
     });
 
     if (state.isAutoFitEnabled !== false) {
-        adjustLineAutoFit(lineEl, lineNum, (lineNum === 1 ? state.fontSizeLine1 : state.fontSizeLine2) || 52);
+        synchronizeLinesAutoFit(document.getElementById("kLine1"), document.getElementById("kLine2"));
     }
 }
 
@@ -1314,74 +2699,263 @@ function applyLinePosition(lineNum, posFraction) {
 }
 
 function applyLineFontSize(lineNum, sizePx) {
-    const lineEl = document.getElementById(lineNum === 1 ? "kLine1" : "kLine2");
-    const val = Math.max(24, Math.min(90, parseInt(sizePx) || 52));
-    if (lineNum === 1) {
-        state.fontSizeLine1 = val;
-        const textEl = document.getElementById("stageFontSize1Text");
-        const sliderEl = document.getElementById("stageFontSize1Slider");
-        if (textEl) textEl.textContent = `${val}px`;
-        if (sliderEl) sliderEl.value = val;
-    } else {
-        state.fontSizeLine2 = val;
-        const textEl = document.getElementById("stageFontSize2Text");
-        const sliderEl = document.getElementById("stageFontSize2Slider");
-        if (textEl) textEl.textContent = `${val}px`;
-        if (sliderEl) sliderEl.value = val;
+    const val = Math.max(18, Math.min(120, parseInt(sizePx) || 52));
+    // Always keep Line 1 and Line 2 in perfect synchronization for studio balance
+    state.fontSizeLine1 = val;
+    state.fontSizeLine2 = val;
+
+    const textEl1 = document.getElementById("stageFontSize1Text");
+    const sliderEl1 = document.getElementById("stageFontSize1Slider");
+    if (textEl1) textEl1.textContent = `${val}px`;
+    if (sliderEl1) sliderEl1.value = val;
+
+    const textEl2 = document.getElementById("stageFontSize2Text");
+    const sliderEl2 = document.getElementById("stageFontSize2Slider");
+    if (textEl2) textEl2.textContent = `${val}px`;
+    if (sliderEl2) sliderEl2.value = val;
+
+    // Sync master font size slider & text in Tab 1
+    const masterSlider = document.getElementById("masterFontSizeSlider");
+    const masterText = document.getElementById("masterFontSizeText");
+    const masterVal = document.getElementById("masterFontSizeVal");
+    if (masterSlider) masterSlider.value = val;
+    if (masterText) masterText.textContent = `${val}px`;
+    if (masterVal) masterVal.textContent = `${val}px`;
+
+    // Sync export font size slider & text in Export Tab
+    const exportSlider = document.getElementById("exportFontSizeSlider");
+    const exportText = document.getElementById("exportFontSizeText");
+    if (exportSlider) exportSlider.value = val;
+    if (exportText) exportText.textContent = `${val}px`;
+
+    // Sync active size preset chips and pills
+    document.querySelectorAll(".btn-size-preset, .size-preset-btn").forEach(btn => {
+        const btnSize = parseInt(btn.dataset.size);
+        btn.classList.toggle("active", Math.abs(btnSize - val) < 4);
+    });
+
+    // Update Floating HUD Badges for both lines
+    const hudSizeEl1 = document.getElementById("kLine1HudSize");
+    const hudSizeEl2 = document.getElementById("kLine2HudSize");
+    if (hudSizeEl1) hudSizeEl1.textContent = `${val}px`;
+    if (hudSizeEl2) hudSizeEl2.textContent = `${val}px`;
+
+    const k1 = document.getElementById("kLine1");
+    const k2 = document.getElementById("kLine2");
+    if (k1) {
+        const c1 = k1.querySelector(".line-content") || k1;
+        c1.style.fontSize = `${val}px`;
+    }
+    if (k2) {
+        const c2 = k2.querySelector(".line-content") || k2;
+        c2.style.fontSize = `${val}px`;
     }
 
-    // Update Floating HUD Badge font size
-    const hudSizeEl = document.getElementById(lineNum === 1 ? "kLine1HudSize" : "kLine2HudSize");
-    if (hudSizeEl) hudSizeEl.textContent = `${val}px`;
+    if (state.isAutoFitEnabled !== false) {
+        synchronizeLinesAutoFit(k1, k2);
+    }
+    updateExportSummary();
+}
 
-    if (lineEl) {
-        const contentEl = lineEl.querySelector(".line-content") || lineEl;
-        contentEl.style.fontSize = `${val}px`;
-        if (state.isAutoFitEnabled !== false) {
-            adjustLineAutoFit(lineEl, lineNum, val);
+function applyMasterFontSize(sizePx) {
+    const val = Math.max(18, Math.min(120, parseInt(sizePx) || 52));
+    applyLineFontSize(1, val);
+    applyLineFontSize(2, val);
+}
+
+let _measureCanvas = null;
+function measureKaraokeTextWidth(text, fontSize, fontFamily) {
+    if (!text) return 0;
+    if (!_measureCanvas) _measureCanvas = document.createElement("canvas");
+    const ctx = _measureCanvas.getContext("2d");
+    if (!ctx) return text.length * fontSize * 0.62;
+    const cleanFont = (fontFamily || state.fontName || "Outfit").replace(/['"]/g, "").split(",")[0].trim();
+    ctx.font = `800 ${fontSize}px ${cleanFont}, sans-serif`;
+    return ctx.measureText(text).width;
+}
+
+function getLineSafeAvailableWidth(lineEl, stageW) {
+    const safeMargin = Math.round(stageW * 0.06);
+    const maxSafeW = Math.max(200, stageW - (safeMargin * 2));
+    if (!lineEl) return maxSafeW;
+
+    const isCenter = lineEl.classList.contains("align-center") || lineEl.dataset.align === "center";
+    if (isCenter) return maxSafeW;
+
+    const isRight = lineEl.classList.contains("align-right") || lineEl.dataset.align === "right";
+    if (isRight) return maxSafeW;
+
+    // Left-aligned or custom offset:
+    const leftPx = lineEl.offsetLeft;
+    const avail = (stageW - safeMargin) - leftPx;
+    return Math.max(120, Math.min(maxSafeW, avail));
+}
+
+function getSongGlobalSafeFontSize() {
+    if (state._cachedSongSafeSize && state._cachedSongSafeSizeSegsRef === state.currentProject?.segments) {
+        return state._cachedSongSafeSize;
+    }
+
+    const segments = state.currentProject?.segments || [];
+    if (!segments.length) return 88;
+
+    const stageScreen = document.getElementById("stageScreen");
+    const stageW = stageScreen?.clientWidth || 1200;
+    const maxSafeW = Math.round(stageW * 0.82);
+    const font = (state.fontName || "Outfit").replace(/['"]/g, "").split(",")[0].trim();
+
+    const testSize = 52;
+    let minFit = 115;
+
+    for (let i = 0; i < segments.length; i++) {
+        const seg = segments[i];
+        const text = (seg.text || "").trim();
+        if (!text) continue;
+        const w = measureKaraokeTextWidth(text, testSize, font);
+        const wordCount = text.split(/\s+/).length;
+        const adjustedW = w + (wordCount * 8) + 36;
+        if (adjustedW > 0) {
+            const fit = Math.floor((maxSafeW / adjustedW) * testSize);
+            if (fit < minFit) {
+                minFit = fit;
+            }
         }
     }
+
+    const result = Math.max(26, Math.min(115, minFit));
+    state._cachedSongSafeSize = result;
+    state._cachedSongSafeSizeSegsRef = segments;
+    return result;
+}
+
+function calculateCoupletMaxSafeSize(k1, k2, stageW) {
+    return (state.isAutoFitEnabled !== false) ? getSongGlobalSafeFontSize() : 115;
+}
+
+window.calculateGlobalMaxSafeFontSize = function(notify = true) {
+    if (!state.currentProject || !state.currentProject.segments || !state.currentProject.segments.length) {
+        if (notify) showToastNotification("Chưa có danh sách câu hát để quét!");
+        return 56;
+    }
+
+    state._cachedSongSafeSize = null;
+    state._cachedSongSafeSizeSegsRef = null;
+    const recommendedSize = getSongGlobalSafeFontSize();
+    applyMasterFontSize(recommendedSize);
+    saveProjectStageSettings();
+
+    if (notify) {
+        showToastNotification(`Đã cân bằng toàn bài: Cỡ chữ ${recommendedSize}px đồng đều 100% không tràn viền!`);
+    }
+    return recommendedSize;
+};
+
+function synchronizeLinesAutoFit(kLine1, kLine2) {
+    const stageScreen = document.getElementById("stageScreen");
+    if (!stageScreen) return;
+    const stageW = stageScreen.clientWidth || 800;
+    const safeMargin = Math.round(stageW * 0.06);
+    const maxSafeW = Math.round(stageW * 0.82); // 82% max width prevents either left or right overflow
+
+    kLine1 = kLine1 || document.getElementById("kLine1");
+    kLine2 = kLine2 || document.getElementById("kLine2");
+    if (!kLine1 || !kLine2) return;
+
+    const content1 = kLine1.querySelector(".line-content") || kLine1;
+    const content2 = kLine2.querySelector(".line-content") || kLine2;
+
+    const baseFontSize = (state.fontSizeLine1 || state.fontSizeLine2 || 52);
+
+    let uniformFontSize = baseFontSize;
+
+    if (state.isAutoFitEnabled !== false) {
+        const songSafeSize = getSongGlobalSafeFontSize();
+        uniformFontSize = Math.min(baseFontSize, songSafeSize);
+    }
+
+    // Apply 100% uniform font size to BOTH lines across ALL couplets throughout the song
+    if (content1) content1.style.fontSize = `${uniformFontSize}px`;
+    if (content2) content2.style.fontSize = `${uniformFontSize}px`;
+
+    // Secondary safety step-down: if rendered DOM still breaches maxSafeW,
+    // reduce uniformFontSize and update cached song safe size so the entire song remains uniform!
+    if (state.isAutoFitEnabled !== false) {
+        let curW1 = content1 ? (content1.scrollWidth || 0) : 0;
+        let curW2 = content2 ? (content2.scrollWidth || 0) : 0;
+        let steps = 0;
+        let adjusted = false;
+        while ((curW1 > maxSafeW || curW2 > maxSafeW) && uniformFontSize > 22 && steps < 5) {
+            uniformFontSize -= 2;
+            if (content1) content1.style.fontSize = `${uniformFontSize}px`;
+            if (content2) content2.style.fontSize = `${uniformFontSize}px`;
+            curW1 = content1 ? (content1.scrollWidth || 0) : 0;
+            curW2 = content2 ? (content2.scrollWidth || 0) : 0;
+            steps++;
+            adjusted = true;
+        }
+        if (adjusted) {
+            state._cachedSongSafeSize = uniformFontSize;
+        }
+    }
+
+    // 1. Reset each line to its correct preset anchor
+    if (state.layoutPreset === "staggered") {
+        kLine1.style.left = (state.line1PosX !== undefined ? `${Math.round(state.line1PosX * 100)}%` : "8%");
+        kLine1.style.right = "auto";
+        kLine1.style.transform = "none";
+        kLine1.style.textAlign = "left";
+
+        kLine2.style.left = "auto";
+        const rightPct = state.line2PosX !== undefined ? Math.round((1.0 - state.line2PosX) * 100) : 8;
+        kLine2.style.right = `${rightPct}%`;
+        kLine2.style.transform = "none";
+        kLine2.style.textAlign = "right";
+    } else if (state.layoutPreset === "center") {
+        kLine1.style.left = "50%";
+        kLine1.style.right = "auto";
+        kLine1.style.transform = "translateX(-50%)";
+        kLine1.style.textAlign = "center";
+
+        kLine2.style.left = "50%";
+        kLine2.style.right = "auto";
+        kLine2.style.transform = "translateX(-50%)";
+        kLine2.style.textAlign = "center";
+    }
+
+    // 2. TWO-WAY POSITION CLAMPING SAFEGUARD:
+    // Guarantees left edge is NEVER < safeMargin, and right edge NEVER > stageW - safeMargin!
+    [kLine1, kLine2].forEach(lineEl => {
+        if (!lineEl) return;
+        const isCenter = lineEl.classList.contains("align-center") || lineEl.dataset.align === "center";
+        if (isCenter) return; // Centered lines are balanced by transform: translateX(-50%)
+
+        const leftPx = lineEl.offsetLeft;
+        const width = lineEl.offsetWidth || lineEl.scrollWidth || 0;
+
+        if (leftPx < safeMargin) {
+            // PUSH RIGHT: left edge breached left safe margin or went negative!
+            lineEl.style.left = `${safeMargin}px`;
+            lineEl.style.right = "auto";
+        } else if (leftPx + width > stageW - safeMargin) {
+            // PUSH LEFT: right edge breached right safe margin!
+            const correctedLeft = Math.max(safeMargin, (stageW - safeMargin) - width);
+            lineEl.style.left = `${correctedLeft}px`;
+            lineEl.style.right = "auto";
+        }
+    });
+
+    const hud1 = document.getElementById("kLine1HudSize");
+    const hud2 = document.getElementById("kLine2HudSize");
+    const isAutoScaled = uniformFontSize < baseFontSize;
+    const tag = isAutoScaled ? ` (${uniformFontSize}px Đồng đều)` : "";
+    if (hud1) hud1.textContent = `${uniformFontSize}px${tag}`;
+    if (hud2) hud2.textContent = `${uniformFontSize}px${tag}`;
 }
 
 function adjustLineAutoFit(container, lineNum, baseFontSize) {
-    if (!container) return;
-    const contentEl = container.querySelector(".line-content") || container;
-    const stageScreen = document.getElementById("stageScreen");
-    if (!stageScreen || !contentEl) return;
-
-    // Reset to base size to accurately measure natural content width
-    contentEl.style.fontSize = `${baseFontSize}px`;
-
-    const stageW = stageScreen.clientWidth || 800;
-    const isCenter = container.classList.contains("align-center") || container.dataset.align === "center";
-    const safeMargin = 28;
-
-    let availableW;
-    if (isCenter) {
-        availableW = stageW - (safeMargin * 2);
-    } else {
-        const leftPx = container.offsetLeft;
-        availableW = Math.max(100, stageW - leftPx - safeMargin);
-    }
-
-    const textW = contentEl.scrollWidth;
-
-    if (textW > availableW && availableW > 120) {
-        const scale = (availableW - 8) / textW;
-        const fittedSize = Math.max(26, Math.floor(baseFontSize * scale));
-        contentEl.style.fontSize = `${fittedSize}px`;
-
-        const hudSizeEl = document.getElementById(lineNum === 1 ? "kLine1HudSize" : "kLine2HudSize");
-        if (hudSizeEl && fittedSize < baseFontSize) {
-            hudSizeEl.textContent = `${fittedSize}px (Tự co)`;
-        }
-    } else {
-        contentEl.style.fontSize = `${baseFontSize}px`;
-        const hudSizeEl = document.getElementById(lineNum === 1 ? "kLine1HudSize" : "kLine2HudSize");
-        if (hudSizeEl) {
-            hudSizeEl.textContent = `${baseFontSize}px`;
-        }
-    }
+    const k1 = document.getElementById("kLine1");
+    const k2 = document.getElementById("kLine2");
+    synchronizeLinesAutoFit(k1, k2);
 }
 
 function applyLayoutPreset(presetName, notify = true) {
@@ -1397,10 +2971,22 @@ function applyLayoutPreset(presetName, notify = true) {
         state.line1Align = "center";
         state.line2Align = "center";
 
+        kLine1.classList.remove("align-right");
+        kLine2.classList.remove("align-right");
         kLine1.classList.add("align-center");
         kLine2.classList.add("align-center");
         kLine1.dataset.align = "center";
         kLine2.dataset.align = "center";
+
+        kLine1.style.left = "50%";
+        kLine1.style.right = "auto";
+        kLine1.style.transform = "translateX(-50%)";
+        kLine1.style.textAlign = "center";
+
+        kLine2.style.left = "50%";
+        kLine2.style.right = "auto";
+        kLine2.style.transform = "translateX(-50%)";
+        kLine2.style.textAlign = "center";
 
         state.line1PosX = 0.50;
         state.line2PosX = 0.50;
@@ -1429,64 +3015,153 @@ function applyLayoutPreset(presetName, notify = true) {
         document.getElementById("btnPresetCenter")?.classList.add("active");
 
         updateKaraokeStage(beatAudio.currentTime);
-        if (notify) showToastNotification("🎯 Đã bật bố cục Căn Giữa Chuẩn Studio (Hình 2)!");
+        if (notify) showToastNotification("Đã bật bố cục Căn Giữa Chuẩn Studio (Hình 2)!");
     } else if (presetName === "staggered") {
         state.layoutPreset = "staggered";
         state.line1Align = "left";
         state.line2Align = "right";
 
-        kLine1.classList.remove("align-center");
+        kLine1.classList.remove("align-center", "align-right");
         kLine2.classList.remove("align-center");
+        kLine2.classList.add("align-right");
+
         kLine1.dataset.align = "left";
         kLine2.dataset.align = "right";
 
-        applyLinePositionX(1, 0.08);
+        kLine1.style.left = "8%";
+        kLine1.style.right = "auto";
+        kLine1.style.transform = "none";
+        kLine1.style.textAlign = "left";
+
+        kLine2.style.left = "auto";
+        kLine2.style.right = "8%";
+        kLine2.style.transform = "none";
+        kLine2.style.textAlign = "right";
+
+        state.line1PosX = 0.08;
+        state.line2PosX = 0.92;
+        state.line1PosY = 0.60;
+        state.line2PosY = 0.76;
+
         applyLinePositionY(1, 0.60);
-        applyLinePositionX(2, 0.42);
         applyLinePositionY(2, 0.76);
         applyLineFontSize(1, state.fontSizeLine1 || 52);
         applyLineFontSize(2, state.fontSizeLine2 || 52);
 
+        const sliderX1 = document.getElementById("stagePosX1Slider");
+        const sliderX2 = document.getElementById("stagePosX2Slider");
+        const textX1 = document.getElementById("stagePosX1Text");
+        const textX2 = document.getElementById("stagePosX2Text");
+        if (sliderX1) sliderX1.value = 8;
+        if (sliderX2) sliderX2.value = 92;
+        if (textX1) textX1.textContent = "8% (Trái)";
+        if (textX2) textX2.textContent = "92% (Phải)";
+
+        const hudPos1 = document.getElementById("kLine1HudPos");
+        const hudPos2 = document.getElementById("kLine2HudPos");
+        if (hudPos1) hudPos1.textContent = "Trái (8%) • Y: 60%";
+        if (hudPos2) hudPos2.textContent = "Phải (92%) • Y: 76%";
+
         document.getElementById("btnPresetStaggered")?.classList.add("active");
 
         updateKaraokeStage(beatAudio.currentTime);
-        if (notify) showToastNotification("📐 Đã bật bố cục So Le Trái - Phải!");
+        if (notify) showToastNotification("Đã bật bố cục So Le Trái - Phải Chuẩn KTV!");
     } else if (presetName === "autofit_all") {
         document.getElementById("btnPresetAutoFit")?.classList.add("active");
-
-        const segments = state.currentProject?.segments || [];
-        let maxChars = 0;
-        let maxWords = 0;
-        segments.forEach(seg => {
-            const txt = (seg.text || "").trim();
-            if (txt.length > maxChars) maxChars = txt.length;
-            const wCount = (seg.words || []).length || txt.split(/\s+/).length;
-            if (wCount > maxWords) maxWords = wCount;
-        });
-
-        let optimalSize = 56;
-        if (maxChars > 42 || maxWords > 8) optimalSize = 46;
-        else if (maxChars > 32 || maxWords > 6) optimalSize = 52;
-        else if (maxChars > 22 || maxWords > 4) optimalSize = 58;
-        else optimalSize = 64;
-
-        applyLineFontSize(1, optimalSize);
-        applyLineFontSize(2, optimalSize);
-
-        updateKaraokeStage(beatAudio.currentTime);
-        if (notify) showToastNotification(`✨ Đã tự động tối ưu cỡ chữ toàn bài: ${optimalSize}px!`);
+        calculateGlobalMaxSafeFontSize(notify);
     }
 
     if (state.currentProject) {
         saveProjectStageSettings();
     }
+    updateExportSummary();
+}
+
+function applyStyleTheme(themeKey, notify = true) {
+    document.querySelectorAll(".btn-dock-theme").forEach(b => b.classList.remove("active"));
+
+    if (themeKey === "tronghieu") {
+        document.getElementById("btnThemeTrongHieu")?.classList.add("active");
+        applyStageFont("Arial, sans-serif");
+        applyLayoutPreset("staggered", false);
+        applyStageActiveColor("#0018F5");
+        applyMasterFontSize(52);
+        state.wipingFxMode = "smooth";
+        applyWipingFxMode();
+        state.stageDisplayMode = "pingpong";
+        state.showCountdownDots = true;
+        const chk = document.getElementById("chkCountdownDots");
+        if (chk) chk.checked = true;
+        if (notify) showToastNotification("Đã chọn Mẫu Trọng Hiếu KTV (Arial Bold, Xanh KTV, So Le)!");
+    } else if (themeKey === "bolero") {
+        document.getElementById("btnThemeBolero")?.classList.add("active");
+        applyStageFont("'Pattaya', sans-serif");
+        applyLayoutPreset("staggered", false);
+        applyStageActiveColor("#FFE259");
+        applyMasterFontSize(50);
+        state.wipingFxMode = "smooth";
+        applyWipingFxMode();
+        state.stageDisplayMode = "pingpong";
+        state.showCountdownDots = true;
+        const chk = document.getElementById("chkCountdownDots");
+        if (chk) chk.checked = true;
+        if (notify) showToastNotification("Đã chọn Mẫu Trữ Tình Bolero (Font Thư Pháp, Vàng Gold)!");
+    } else if (themeKey === "remix") {
+        document.getElementById("btnThemeRemix")?.classList.add("active");
+        applyStageFont("'Outfit', sans-serif");
+        applyLayoutPreset("center", false);
+        applyStageActiveColor("#00F2FE");
+        applyMasterFontSize(54);
+        state.wipingFxMode = "comet";
+        applyWipingFxMode();
+        state.stageDisplayMode = "pingpong";
+        state.showCountdownDots = true;
+        const chk = document.getElementById("chkCountdownDots");
+        if (chk) chk.checked = true;
+        if (notify) showToastNotification("Đã chọn Mẫu Hiện Đại Remix (Font Outfit, Cyber Cyan, Tia Sáng)!");
+    } else if (themeKey === "minimal") {
+        document.getElementById("btnThemeMinimal")?.classList.add("active");
+        applyStageFont("'Be Vietnam Pro', sans-serif");
+        applyLayoutPreset("center", false);
+        applyStageActiveColor("#FFFFFF");
+        applyMasterFontSize(48);
+        state.wipingFxMode = "smooth";
+        applyWipingFxMode();
+        state.stageDisplayMode = "pingpong";
+        state.showCountdownDots = true;
+        const chk = document.getElementById("chkCountdownDots");
+        if (chk) chk.checked = true;
+        if (notify) showToastNotification("Đã chọn Mẫu Tối Giản Trắng (Be Vietnam Pro, Viền Đen, Căn Giữa)!");
+    }
+
+    // Synchronize inputs in inspector
+    const stageFontSelect = document.getElementById("stageFontSelect");
+    if (stageFontSelect && state.stageFontFamily) {
+        stageFontSelect.value = state.stageFontFamily;
+    }
+    document.querySelectorAll(".display-mode-btn").forEach(b => {
+        b.classList.toggle("active", b.dataset.mode === (state.stageDisplayMode || "pingpong"));
+    });
+    document.querySelectorAll(".fx-style-btn").forEach(b => {
+        b.classList.toggle("active", b.dataset.fx === (state.wipingFxMode || "smooth"));
+    });
+    document.querySelectorAll(".drawer-color-chip, .stage-color-dot").forEach(b => {
+        b.classList.toggle("active", b.dataset.color === state.stageActiveColor);
+    });
+
+    if (state.currentProject) {
+        saveProjectStageSettings();
+    }
+    updateKaraokeStage(beatAudio.currentTime);
+}
+
+function applyPresetTrongHieu(notify = true) {
+    applyStyleTheme("tronghieu", notify);
 }
 
 async function saveProjectStageSettings() {
     if (!state.currentProject) return;
     const stageFontSelect = document.getElementById("stageFontSelect");
-    const colorInactive = document.getElementById("colorInactive");
-    const colorActive = document.getElementById("colorActive");
 
     const payload = {
         line1_pos_x: state.line1PosX !== undefined ? state.line1PosX : 0.50,
@@ -1501,9 +3176,15 @@ async function saveProjectStageSettings() {
         layout_preset: state.layoutPreset || "center",
         is_autofit: state.isAutoFitEnabled !== false,
         font_name: stageFontSelect ? stageFontSelect.value : "Outfit",
-        primary_color: colorInactive ? hexToAssColor(colorInactive.value) : "&H00FFFFFF",
-        karaoke_color: colorActive ? hexToAssColor(colorActive.value) : "&H0000E5FF",
-        bg_theme: state.bgTheme || "nebula"
+        primary_color: hexToAssColor(state.colorInactive || "#ffffff"),
+        karaoke_color: hexToAssColor(state.colorActive || "#0018F5"),
+        color_active_hex: state.colorActive || "#0018F5",
+        color_inactive_hex: state.colorInactive || "#ffffff",
+        bg_theme: state.bgTheme || "nebula",
+        pitch_semitones: state.currentPitchSemitones || 0,
+        wiping_fx: state.wipingFxMode || "smooth",
+        show_countdown: state.showCountdownDots !== false,
+        display_mode: state.stageDisplayMode || "pingpong"
     };
 
     try {
@@ -1536,7 +3217,7 @@ function setupDraggableSubtitle() {
             e.preventDefault();
             const cur = lineNum === 1 ? (state.fontSizeLine1 || 52) : (state.fontSizeLine2 || 52);
             const delta = e.deltaY < 0 ? 3 : -3;
-            const newSize = Math.max(24, Math.min(88, cur + delta));
+            const newSize = Math.max(24, Math.min(115, cur + delta));
             applyLineFontSize(lineNum, newSize);
         }, { passive: false });
 
@@ -1576,11 +3257,13 @@ function setupDraggableSubtitle() {
             lineEl.classList.add("dragging");
             stageScreen.classList.add("dragging-active");
 
-            if (lineEl.classList.contains("align-center")) {
-                lineEl.classList.remove("align-center");
+            if (lineEl.classList.contains("align-center") || lineEl.classList.contains("align-right")) {
+                lineEl.classList.remove("align-center", "align-right");
                 delete lineEl.dataset.align;
                 lineEl.style.left = `${initialLeftPx}px`;
-                document.querySelectorAll(".btn-preset-chip").forEach(b => b.classList.remove("active"));
+                lineEl.style.right = "auto";
+                lineEl.style.transform = "none";
+                document.querySelectorAll(".btn-preset-chip, .btn-dock-pill").forEach(b => b.classList.remove("active"));
             }
             e.preventDefault();
         });
@@ -1596,11 +3279,13 @@ function setupDraggableSubtitle() {
                 lineEl.classList.add("dragging");
                 stageScreen.classList.add("dragging-active");
 
-                if (lineEl.classList.contains("align-center")) {
-                    lineEl.classList.remove("align-center");
+                if (lineEl.classList.contains("align-center") || lineEl.classList.contains("align-right")) {
+                    lineEl.classList.remove("align-center", "align-right");
                     delete lineEl.dataset.align;
                     lineEl.style.left = `${initialLeftPx}px`;
-                    document.querySelectorAll(".btn-preset-chip").forEach(b => b.classList.remove("active"));
+                    lineEl.style.right = "auto";
+                    lineEl.style.transform = "none";
+                    document.querySelectorAll(".btn-preset-chip, .btn-dock-pill").forEach(b => b.classList.remove("active"));
                 }
             }
         }, { passive: true });
@@ -1616,8 +3301,19 @@ function setupDraggableSubtitle() {
         window.addEventListener("mousemove", (e) => {
             if (isResizing) {
                 const delta = ((e.clientX - startX) + (e.clientY - startY)) * 0.35;
-                const newSize = Math.max(24, Math.min(88, Math.round(initialSize + delta)));
+                const stageW = stageScreen.clientWidth || 800;
+                const maxSafe = calculateCoupletMaxSafeSize(kLine1, kLine2, stageW);
+                const rawTarget = Math.round(initialSize + delta);
+                const isClamped = rawTarget > maxSafe;
+                const newSize = Math.max(24, Math.min(maxSafe, rawTarget));
+
+                lineEl.classList.toggle("clamped-boundary", isClamped);
                 applyLineFontSize(lineNum, newSize);
+
+                if (isClamped) {
+                    const hud = document.getElementById(lineNum === 1 ? "kLine1HudSize" : "kLine2HudSize");
+                    if (hud) hud.textContent = `${newSize}px (Đạt giới hạn viền)`;
+                }
                 return;
             }
 
@@ -1628,11 +3324,12 @@ function setupDraggableSubtitle() {
             const stageH = stageScreen.clientHeight || 480;
             const lineW = lineEl.clientWidth || 200;
             const lineH = lineEl.clientHeight || 50;
+            const safeMargin = Math.round(stageW * 0.06);
 
-            const maxLeft = Math.max(20, stageW - lineW - 16);
+            const maxLeft = Math.max(safeMargin, stageW - lineW - safeMargin);
             const maxTop = stageH - lineH - 10;
 
-            const newLeft = Math.max(10, Math.min(maxLeft, initialLeftPx + deltaX));
+            const newLeft = Math.max(safeMargin, Math.min(maxLeft, initialLeftPx + deltaX));
             const newTop = Math.max(10, Math.min(maxTop, initialTopPx + deltaY));
 
             applyLinePositionX(lineNum, newLeft / stageW);
@@ -1642,8 +3339,19 @@ function setupDraggableSubtitle() {
         window.addEventListener("touchmove", (e) => {
             if (isResizing && e.touches.length === 1) {
                 const delta = ((e.touches[0].clientX - startX) + (e.touches[0].clientY - startY)) * 0.35;
-                const newSize = Math.max(24, Math.min(88, Math.round(initialSize + delta)));
+                const stageW = stageScreen.clientWidth || 800;
+                const maxSafe = calculateCoupletMaxSafeSize(kLine1, kLine2, stageW);
+                const rawTarget = Math.round(initialSize + delta);
+                const isClamped = rawTarget > maxSafe;
+                const newSize = Math.max(24, Math.min(maxSafe, rawTarget));
+
+                lineEl.classList.toggle("clamped-boundary", isClamped);
                 applyLineFontSize(lineNum, newSize);
+
+                if (isClamped) {
+                    const hud = document.getElementById(lineNum === 1 ? "kLine1HudSize" : "kLine2HudSize");
+                    if (hud) hud.textContent = `${newSize}px (Đạt giới hạn viền)`;
+                }
                 return;
             }
 
@@ -1654,11 +3362,12 @@ function setupDraggableSubtitle() {
             const stageH = stageScreen.clientHeight || 480;
             const lineW = lineEl.clientWidth || 200;
             const lineH = lineEl.clientHeight || 50;
+            const safeMargin = Math.round(stageW * 0.06);
 
-            const maxLeft = Math.max(20, stageW - lineW - 16);
+            const maxLeft = Math.max(safeMargin, stageW - lineW - safeMargin);
             const maxTop = stageH - lineH - 10;
 
-            const newLeft = Math.max(10, Math.min(maxLeft, initialLeftPx + deltaX));
+            const newLeft = Math.max(safeMargin, Math.min(maxLeft, initialLeftPx + deltaX));
             const newTop = Math.max(10, Math.min(maxTop, initialTopPx + deltaY));
 
             applyLinePositionX(lineNum, newLeft / stageW);
@@ -1673,7 +3382,7 @@ function setupDraggableSubtitle() {
             }
             if (isResizing) {
                 isResizing = false;
-                lineEl.classList.remove("resizing");
+                lineEl.classList.remove("resizing", "clamped-boundary");
             }
         });
 
@@ -1685,7 +3394,7 @@ function setupDraggableSubtitle() {
             }
             if (isResizing) {
                 isResizing = false;
-                lineEl.classList.remove("resizing");
+                lineEl.classList.remove("resizing", "clamped-boundary");
             }
         });
     }
@@ -1693,9 +3402,31 @@ function setupDraggableSubtitle() {
     attachDraggableToLine(kLine1, 1);
     attachDraggableToLine(kLine2, 2);
 
-    // Quick Layout Presets Listeners
+    // Keep lines calibrated to exact 16:9 stage geometry on any window resize or scale
+    if (window.ResizeObserver && stageScreen) {
+        const stageResizeObserver = new ResizeObserver(() => {
+            state._cachedSongSafeSize = null;
+            state._cachedSongSafeSizeSegsRef = null;
+            if (state.line1PosY !== undefined) applyLinePositionY(1, state.line1PosY);
+            if (state.line2PosY !== undefined) applyLinePositionY(2, state.line2PosY);
+            if (state.line1PosX !== undefined) applyLinePositionX(1, state.line1PosX);
+            if (state.line2PosX !== undefined) applyLinePositionX(2, state.line2PosX);
+            synchronizeLinesAutoFit(kLine1, kLine2);
+        });
+        stageResizeObserver.observe(stageScreen);
+    }
+
+    // 1-Click Style Themes & Quick Layout Listeners
+    document.getElementById("btnThemeTrongHieu")?.addEventListener("click", () => applyStyleTheme("tronghieu", true));
+    document.getElementById("btnThemeBolero")?.addEventListener("click", () => applyStyleTheme("bolero", true));
+    document.getElementById("btnThemeRemix")?.addEventListener("click", () => applyStyleTheme("remix", true));
+    document.getElementById("btnThemeMinimal")?.addEventListener("click", () => applyStyleTheme("minimal", true));
+
+    document.getElementById("btnPresetTrongHieu")?.addEventListener("click", () => applyStyleTheme("tronghieu", true));
     document.getElementById("btnPresetCenter")?.addEventListener("click", () => applyLayoutPreset("center"));
     document.getElementById("btnPresetStaggered")?.addEventListener("click", () => applyLayoutPreset("staggered"));
+    document.getElementById("btnDrawerLayoutCenter")?.addEventListener("click", () => applyLayoutPreset("center"));
+    document.getElementById("btnDrawerLayoutStaggered")?.addEventListener("click", () => applyLayoutPreset("staggered"));
     document.getElementById("btnPresetAutoFit")?.addEventListener("click", () => applyLayoutPreset("autofit_all"));
 
     const chkAutoFit = document.getElementById("chkAutoFit");
@@ -1732,7 +3463,29 @@ function setupDraggableSubtitle() {
         applyStageFont(e.target.value);
     });
 
-    // Font Size Sliders
+    // Master Font Size Slider & Zoom Buttons (Tab 1)
+    const masterSlider = document.getElementById("masterFontSizeSlider");
+    masterSlider?.addEventListener("input", (e) => {
+        applyMasterFontSize(e.target.value);
+    });
+    document.getElementById("btnMasterZoomIn")?.addEventListener("click", () => {
+        const cur = parseInt(document.getElementById("masterFontSizeSlider")?.value || state.fontSizeLine1 || 52);
+        applyMasterFontSize(cur + 4);
+    });
+    document.getElementById("btnMasterZoomOut")?.addEventListener("click", () => {
+        const cur = parseInt(document.getElementById("masterFontSizeSlider")?.value || state.fontSizeLine1 || 52);
+        applyMasterFontSize(cur - 4);
+    });
+
+    // Preset size chips click
+    document.querySelectorAll(".size-preset-chips .btn-size-preset").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const sz = parseInt(btn.dataset.size);
+            if (sz) applyMasterFontSize(sz);
+        });
+    });
+
+    // Font Size Sliders (Tab 2)
     const size1Slider = document.getElementById("stageFontSize1Slider");
     const size2Slider = document.getElementById("stageFontSize2Slider");
 
@@ -1744,7 +3497,7 @@ function setupDraggableSubtitle() {
         applyLineFontSize(2, e.target.value);
     });
 
-    // Quick Zoom Buttons in Drawer
+    // Quick Zoom Buttons in Tab 2
     document.getElementById("btnZoomIn1")?.addEventListener("click", () => {
         applyLineFontSize(1, (state.fontSizeLine1 || 52) + 4);
     });
@@ -1756,6 +3509,44 @@ function setupDraggableSubtitle() {
     });
     document.getElementById("btnZoomOut2")?.addEventListener("click", () => {
         applyLineFontSize(2, (state.fontSizeLine2 || 52) - 4);
+    });
+
+    // Export Tab Font Size Controls
+    const exportSlider = document.getElementById("exportFontSizeSlider");
+    exportSlider?.addEventListener("input", (e) => {
+        applyMasterFontSize(e.target.value);
+    });
+    document.getElementById("btnExportZoomIn")?.addEventListener("click", () => {
+        const cur = parseInt(document.getElementById("exportFontSizeSlider")?.value || state.fontSizeLine1 || 52);
+        applyMasterFontSize(cur + 4);
+    });
+    document.getElementById("btnExportZoomOut")?.addEventListener("click", () => {
+        const cur = parseInt(document.getElementById("exportFontSizeSlider")?.value || state.fontSizeLine1 || 52);
+        applyMasterFontSize(cur - 4);
+    });
+
+    // Custom Font Size Direct Prompt on Badge Click
+    const promptFontSize = (currentVal, callback) => {
+        const input = prompt(`Nhập cỡ chữ mong muốn (18 - 120 px):`, currentVal);
+        if (input !== null) {
+            const parsed = parseInt(input.trim());
+            if (!isNaN(parsed) && parsed >= 18 && parsed <= 120) {
+                callback(parsed);
+            }
+        }
+    };
+
+    document.getElementById("masterFontSizeText")?.addEventListener("click", () => {
+        promptFontSize(state.fontSizeLine1 || 52, (sz) => applyMasterFontSize(sz));
+    });
+    document.getElementById("stageFontSize1Text")?.addEventListener("click", () => {
+        promptFontSize(state.fontSizeLine1 || 52, (sz) => applyLineFontSize(1, sz));
+    });
+    document.getElementById("stageFontSize2Text")?.addEventListener("click", () => {
+        promptFontSize(state.fontSizeLine2 || 52, (sz) => applyLineFontSize(2, sz));
+    });
+    document.getElementById("exportFontSizeText")?.addEventListener("click", () => {
+        promptFontSize(state.fontSizeLine1 || 52, (sz) => applyMasterFontSize(sz));
     });
 
     // 9-Point Grid Matrix Click Handlers
@@ -1775,45 +3566,21 @@ function setupDraggableSubtitle() {
         });
     });
 
-    // Inspector Tabs Switcher
-    const tabBtnStyle = document.getElementById("tabBtnStyle");
-    const tabBtnPosition = document.getElementById("tabBtnPosition");
-    const paneStyle = document.getElementById("paneStyle");
-    const panePosition = document.getElementById("panePosition");
 
-    tabBtnStyle?.addEventListener("click", () => {
-        tabBtnStyle.classList.add("active");
-        tabBtnPosition?.classList.remove("active");
-        if (paneStyle) paneStyle.style.display = "block";
-        if (panePosition) panePosition.style.display = "none";
-    });
-
-    tabBtnPosition?.addEventListener("click", () => {
-        tabBtnPosition.classList.add("active");
-        tabBtnStyle?.classList.remove("active");
-        if (panePosition) panePosition.style.display = "block";
-        if (paneStyle) paneStyle.style.display = "none";
-    });
-
-    // Fine Sync Toggle
-    const btnToggleFineSync = document.getElementById("btnToggleFineSync");
-    const fineSyncDrawer = document.getElementById("fineSyncDrawer");
-    btnToggleFineSync?.addEventListener("click", () => {
-        if (fineSyncDrawer) {
-            const isHidden = fineSyncDrawer.style.display === "none";
-            fineSyncDrawer.style.display = isHidden ? "block" : "none";
-            btnToggleFineSync.textContent = isHidden ? "▲" : "▼";
-        }
-    });
 
     // Cinema / Clean Immersion Mode Toggle
     const btnToggleCinema = document.getElementById("btnToggleCinema");
+    const btnCinemaMaster = document.getElementById("btnCinemaMaster");
     btnToggleCinema?.addEventListener("click", () => {
         const stageWrapper = document.querySelector(".karaoke-stage-wrapper") || document.querySelector(".studio-main-col") || document.body;
         const isCinema = stageWrapper.classList.toggle("cinema-active");
         btnToggleCinema.classList.toggle("active", isCinema);
-        btnToggleCinema.innerHTML = isCinema ? "<span>✖ Thoát Rạp</span>" : "<span>🔲 Rạp Chiếu</span>";
-        showToastNotification(isCinema ? "🔲 Đã bật Chế độ Rạp Chiếu (Toàn màn hình sạch)" : "Đã trở về chế độ Studio");
+        btnToggleCinema.innerHTML = isCinema ? "<span>Thoát Rạp</span>" : "<span>Rạp Chiếu</span>";
+        if (btnCinemaMaster) {
+            btnCinemaMaster.classList.toggle("active", isCinema);
+            btnCinemaMaster.textContent = isCinema ? "Thoát Rạp" : "Rạp Chiếu";
+        }
+        showToastNotification(isCinema ? "Đã bật Chế độ Rạp Chiếu (Toàn màn hình sạch)" : "Đã trở về chế độ Studio");
     });
 
     // Save Project Settings Button
@@ -1828,19 +3595,242 @@ function setupDraggableSubtitle() {
         }
 
         await saveProjectStageSettings();
-        showToastNotification("✨ Đã lưu cấu hình bài hát thành công!");
+        showToastNotification("Đã lưu cấu hình bài hát thành công!");
     });
 
     btnResetProjectSettings?.addEventListener("click", () => {
         applyLayoutPreset("center");
-        showToastNotification("↺ Đã đặt lại cấu hình mặc định!");
+        showToastNotification("Đã đặt lại cấu hình mặc định!");
     });
 }
 
 
 /**
- * Seamless 2-Line Alternating Karaoke Stage Engine
+ * Professional Couplet Stage Engine (Chuẩn Karaoke Quân Masu / KTV)
+ * - Dòng 1 (Top Line): LUÔN LUÔN là câu hát trước trong cặp
+/**
+ * Professional Alternating Rolling Stage Engine (Chuẩn Karaoke KTV / Trọng Hiếu YouTube)
+ * - Khổ hát (Stanza): Các câu liên tiếp có gap < 2.0s được gom thành một khổ.
+ * - Hàng 1 (Top Line): Phụ trách các câu chẵn trong khổ (0, 2, 4...)
+ * - Hàng 2 (Bottom Line): Phụ trách các câu lẻ trong khổ (1, 3, 5...)
+ * - Đầu khổ: Cả 2 câu xuất hiện cùng lúc (chữ trắng) trước ~2.5s để người hát đọc trước.
+ * - Khi Hàng 1 hát xong: Giữ chữ 0.25s (retention) rồi lật ngay sang câu tiếp theo của Hàng 1 (chữ trắng),
+ *   trong khi Hàng 2 đang quét hát.
+ * - Khi Hàng 2 hát xong: Giữ chữ 0.25s rồi lật ngay sang câu tiếp theo của Hàng 2 (chữ trắng),
+ *   trong khi Hàng 1 đang quét hát.
+ * - Đoạn dạo solo / nghỉ giữa các khổ (gap >= 2.0s): Màn hình sạch chữ hoàn toàn trong lúc solo.
+ *   Trước khi vào khổ mới ~2.0s: 4 chấm nhịp xuất hiện và 2 hàng mới được nạp vào.
  */
+function getAlternatingTimeline(segments) {
+    if (!segments || !segments.length) return [];
+    if (state._memoizedTimeline && state._memoizedTimelineSegsRef === segments) {
+        return state._memoizedTimeline;
+    }
+
+    const validSegs = segments.filter(s => s && (s.words?.length || s.text));
+    if (!validSegs.length) return [];
+
+    const interludeThreshold = 5.0;
+    const retention = 0.25;
+    const defaultLeadIn = 2.5;
+
+    // Partition into stanzas: only split on substantial interlude (>= 5.0s)
+    // AND require current stanza to have at least 2 lines so Row 1 and Row 2 are both populated
+    const stanzas = [];
+    let currStanza = [];
+    for (let i = 0; i < validSegs.length; i++) {
+        const seg = validSegs[i];
+        const gap = i > 0 ? (seg.start - validSegs[i - 1].end) : 0;
+        if (gap >= interludeThreshold && currStanza.length >= 2) {
+            stanzas.push(currStanza);
+            currStanza = [];
+        }
+        currStanza.push(seg);
+    }
+    if (currStanza.length > 0) {
+        stanzas.push(currStanza);
+    }
+
+    const timeline = [];
+    let prevStanzaEnd = 0.0;
+
+    for (let stIdx = 0; stIdx < stanzas.length; stIdx++) {
+        const stanza = stanzas[stIdx];
+        const s0 = stanza[0];
+        const s0Lead = Math.max(0.0, s0.start - defaultLeadIn);
+        const stanzaEntry = stIdx > 0 ? Math.max(prevStanzaEnd + 0.1, s0Lead) : s0Lead;
+
+        const slot1Segs = []; // Even indices within stanza (Hàng 1)
+        const slot2Segs = []; // Odd indices within stanza (Hàng 2)
+
+        for (let j = 0; j < stanza.length; j++) {
+            if (j % 2 === 0) {
+                slot1Segs.push({ j, seg: stanza[j] });
+            } else {
+                slot2Segs.push({ j, seg: stanza[j] });
+            }
+        }
+
+        // Process Slot 1 (Hàng 1 - Top)
+        for (let k = 0; k < slot1Segs.length; k++) {
+            const { j, seg } = slot1Segs[k];
+            const isFirst = (k === 0);
+            const isLast = (k === slot1Segs.length - 1);
+
+            const dispStart = isFirst
+                ? stanzaEntry
+                : Math.min(slot1Segs[k - 1].seg.end + retention, seg.start - 0.15);
+            const dispEnd = isLast
+                ? (seg.end + 0.60)
+                : (seg.end + retention);
+
+            timeline.push({
+                seg,
+                slot: 1,
+                stanzaIdx: stIdx,
+                idxInStanza: j,
+                displayStart: dispStart,
+                displayEnd: dispEnd
+            });
+        }
+
+        // Process Slot 2 (Hàng 2 - Bottom)
+        for (let k = 0; k < slot2Segs.length; k++) {
+            const { j, seg } = slot2Segs[k];
+            const isFirst = (k === 0);
+            const isLast = (k === slot2Segs.length - 1);
+
+            const dispStart = isFirst
+                ? stanzaEntry // Appears along with Slot 1 so singer previews both lines
+                : Math.min(slot2Segs[k - 1].seg.end + retention, seg.start - 0.15);
+            const dispEnd = isLast
+                ? (seg.end + 0.60)
+                : (seg.end + retention);
+
+            timeline.push({
+                seg,
+                slot: 2,
+                stanzaIdx: stIdx,
+                idxInStanza: j,
+                displayStart: dispStart,
+                displayEnd: dispEnd
+            });
+        }
+
+        prevStanzaEnd = Math.max(...stanza.map(s => s.end));
+    }
+
+    timeline.sort((a, b) => a.displayStart - b.displayStart);
+    state._memoizedTimeline = timeline;
+    state._memoizedTimelineSegsRef = segments;
+    return timeline;
+}
+
+function getCoupletPairs(segments) {
+    if (!segments || !segments.length) return [];
+    if (state._memoizedPairs && state._memoizedSegsRef === segments) {
+        return state._memoizedPairs;
+    }
+
+    const pairs = [];
+    let curr = [];
+
+    for (let i = 0; i < segments.length; i++) {
+        const s = segments[i];
+        if (!s || !(s.text || (s.words && s.words.length))) continue;
+        const gap = i > 0 && segments[i - 1] ? (s.start - segments[i - 1].end) : 0;
+
+        if (gap >= 5.0 && curr.length > 0) {
+            pairs.push(curr);
+            curr = [];
+        }
+
+        curr.push(s);
+        if (curr.length === 2) {
+            pairs.push(curr);
+            curr = [];
+        }
+    }
+
+    if (curr.length > 0) {
+        pairs.push(curr);
+    }
+
+    state._memoizedPairs = pairs;
+    state._memoizedSegsRef = segments;
+    return pairs;
+}
+
+function updateKaraokeStageCouplet(currentTime, segments) {
+    const pairs = getCoupletPairs(segments);
+    if (!pairs.length) return;
+
+    let activePair = null;
+    let nextPair = null;
+    let prevPair = null;
+
+    for (let pIdx = 0; pIdx < pairs.length; pIdx++) {
+        const p = pairs[pIdx];
+        const segA = p[0];
+        const segB = p.length > 1 ? p[1] : null;
+
+        const prevEnd = pIdx > 0 ? (pairs[pIdx - 1][pairs[pIdx - 1].length - 1].end) : 0.0;
+        const pairLeadIn = pIdx === 0 ? Math.max(0.0, segA.start - 2.5) : Math.max(prevEnd, segA.start - 2.5);
+        
+        const pairSingEnd = segB ? segB.end : segA.end;
+        const nextStart = pIdx < pairs.length - 1 ? pairs[pIdx + 1][0].start : 99999.0;
+        const gapToNext = nextStart - pairSingEnd;
+        
+        let pairRetention = 0.8;
+        if (gapToNext < 1.0) {
+            pairRetention = Math.max(0.15, gapToNext - 0.2);
+        }
+        const pairExit = pairSingEnd + pairRetention;
+
+        if (currentTime >= pairLeadIn && currentTime <= pairExit) {
+            activePair = p;
+            break;
+        }
+
+        if (pairExit < currentTime) {
+            prevPair = p;
+        }
+        if (pairLeadIn > currentTime && !nextPair) {
+            nextPair = p;
+        }
+    }
+
+    if (!activePair) {
+        if (nextPair) {
+            const timeToNext = nextPair[0].start - currentTime;
+            if (timeToNext <= 2.5) {
+                activePair = nextPair;
+            } else if (prevPair && (currentTime - prevPair[prevPair.length - 1].end) <= 0.8) {
+                activePair = prevPair;
+            } else {
+                renderKaraokeLine(kLine1, null, currentTime);
+                renderKaraokeLine(kLine2, null, currentTime);
+                return;
+            }
+        } else {
+            if (prevPair && (currentTime - prevPair[prevPair.length - 1].end) <= 0.8) {
+                activePair = prevPair;
+            } else {
+                renderKaraokeLine(kLine1, null, currentTime);
+                renderKaraokeLine(kLine2, null, currentTime);
+                return;
+            }
+        }
+    }
+
+    const line1Seg = activePair[0] || null;
+    const line2Seg = activePair.length > 1 ? activePair[1] : null;
+
+    renderKaraokeLine(kLine1, line1Seg, currentTime);
+    renderKaraokeLine(kLine2, line2Seg, currentTime);
+    synchronizeLinesAutoFit(kLine1, kLine2);
+}
+
 function updateKaraokeStage(currentTime) {
     const segments = state.currentProject?.segments || [];
     if (!segments.length) return;
@@ -1848,47 +3838,44 @@ function updateKaraokeStage(currentTime) {
     // 1. Lead-in Countdown Dots Check
     renderCountdownDots(currentTime, segments);
 
-    // 2. Find current active segment (being sung or closest upcoming)
-    let activeIdx = -1;
-    for (let i = 0; i < segments.length; i++) {
-        const seg = segments[i];
-        if (currentTime >= seg.start && currentTime <= (seg.end + 0.15)) {
-            activeIdx = i;
-            break;
-        }
+    // 2. Mode Check: If user explicitly chose legacy couplet mode
+    if (state.stageDisplayMode === "couplet") {
+        updateKaraokeStageCouplet(currentTime, segments);
+        return;
     }
 
-    if (activeIdx === -1) {
-        // Between lines or intro: find next upcoming segment
-        for (let i = 0; i < segments.length; i++) {
-            if (segments[i].start > currentTime) {
-                activeIdx = i;
-                break;
+    // 3. Default: Professional Alternating Rolling Ping-Pong Mode (So Le Luân Phiên Cuốn Chiếu)
+    const timeline = getAlternatingTimeline(segments);
+    if (!timeline.length) return;
+
+    let slot1Seg = null;
+    let slot2Seg = null;
+
+    for (let i = 0; i < timeline.length; i++) {
+        const item = timeline[i];
+        if (currentTime >= item.displayStart && currentTime <= item.displayEnd) {
+            if (item.slot === 1 && !slot1Seg) {
+                slot1Seg = item.seg;
+            } else if (item.slot === 2 && !slot2Seg) {
+                slot2Seg = item.seg;
             }
         }
+        if (slot1Seg && slot2Seg) break;
     }
 
-    if (activeIdx === -1) {
-        // Song ended: show last lines
-        activeIdx = Math.max(0, segments.length - 1);
-    }
-
-    if (activeIdx % 2 === 0) {
-        // Active line is EVEN (0, 2, 4...) -> Sung on Top Line (Line 1)
-        renderKaraokeLine(kLine1, segments[activeIdx], currentTime, true);
-        const nextSeg = segments[activeIdx + 1] || null;
-        renderKaraokeLine(kLine2, nextSeg, currentTime, false);
-    } else {
-        // Active line is ODD (1, 3, 5...) -> Sung on Bottom Line (Line 2)
-        renderKaraokeLine(kLine2, segments[activeIdx], currentTime, true);
-        const nextSeg = segments[activeIdx + 1] || null;
-        renderKaraokeLine(kLine1, nextSeg, currentTime, false);
-    }
+    renderKaraokeLine(kLine1, slot1Seg, currentTime);
+    renderKaraokeLine(kLine2, slot2Seg, currentTime);
+    synchronizeLinesAutoFit(kLine1, kLine2);
 }
 
 function renderCountdownDots(currentTime, segments) {
     const wrap = document.getElementById("stageCountdownWrap");
     if (!wrap) return;
+
+    if (state.showCountdownDots === false) {
+        wrap.style.display = "none";
+        return;
+    }
 
     let nextUpcoming = null;
     let prevEnd = 0;
@@ -1908,10 +3895,24 @@ function renderCountdownDots(currentTime, segments) {
     const timeLeft = nextUpcoming.start - currentTime;
     const gapDuration = nextUpcoming.start - prevEnd;
 
-    // Show countdown if intro or interlude >= 2.0s and within 2.0s before start
-    if (gapDuration >= 2.0 && timeLeft > 0.05 && timeLeft <= 2.0) {
+    // Show countdown only for song intro (prevEnd <= 1.0) or substantial musical interlude (gap >= 3.5s)
+    if ((prevEnd <= 1.0 || gapDuration >= 3.5) && timeLeft > 0.05 && timeLeft <= 2.0) {
+        // Smart vertical positioning: center above Line 1 if Line 1 has top offset
+        const kLine1 = document.getElementById("kLine1");
+        if (kLine1 && kLine1.offsetTop > 60) {
+            wrap.style.top = `${Math.max(32, kLine1.offsetTop - 56)}px`;
+            wrap.style.transform = "translateX(-50%)";
+        } else {
+            wrap.style.top = "50%";
+            wrap.style.transform = "translate(-50%, -50%)";
+        }
+
         wrap.style.display = "flex";
         const dots = wrap.querySelectorAll(".c-dot");
+        const label = document.getElementById("stageCountdownLabel");
+        if (label) {
+            label.textContent = timeLeft <= 0.5 ? "HÁT!" : "VÀO NHỊP";
+        }
         if (dots.length >= 4) {
             dots[0].classList.toggle("active", timeLeft <= 2.0);
             dots[1].classList.toggle("active", timeLeft <= 1.5);
@@ -1924,45 +3925,84 @@ function renderCountdownDots(currentTime, segments) {
     }
 }
 
-function renderKaraokeLine(container, segment, currentTime, isCurrent) {
+function renderKaraokeLine(container, segment, currentTime) {
     if (!container) return;
-    if (segment && segment.id !== undefined) {
-        container.dataset.segIdx = segment.id;
-    } else {
-        container.dataset.segIdx = "";
-    }
-
-    if (container.classList.contains("editing-text")) {
-        return; // Don't overwrite when user is editing text inline
-    }
+    if (container.classList.contains("editing-text")) return;
 
     const contentEl = container.querySelector(".line-content") || container;
     if (!segment) {
+        container.dataset.segIdx = "";
         contentEl.innerHTML = "";
         return;
     }
 
-    const words = segment.words || [];
+    const segId = String(segment.id !== undefined ? segment.id : "");
+    let words = segment.words;
+    if (!words || !words.length) {
+        const wArr = (segment.text || "").trim().split(/\s+/).filter(Boolean);
+        const dur = Math.max(0.2, (segment.end || 1) - (segment.start || 0));
+        const step = dur / Math.max(1, wArr.length);
+        words = wArr.map((wStr, idx) => ({
+            word: wStr,
+            start: (segment.start || 0) + idx * step,
+            end: (segment.start || 0) + (idx + 1) * step
+        }));
+    }
+
     const role = segment.role || "all";
     const roleClass = role !== "all" ? `role-${role}` : "";
-    let html = "";
 
-    words.forEach(w => {
-        const isSung = isCurrent && (currentTime >= w.start);
-        html += `<span class="k-word ${roleClass} ${isSung ? 'active-sung' : ''}">${w.word}</span> `;
-    });
+    // 1. Rebuild DOM ONLY when the segment changes or content is empty
+    if (container.dataset.segIdx !== segId || !contentEl.firstElementChild) {
+        container.dataset.segIdx = segId;
+        let html = "";
+        words.forEach((w, wIdx) => {
+            html += `<span class="k-word-wrap ${roleClass}" data-widx="${wIdx}">` +
+                    `<span class="k-word-base">${w.word}</span>` +
+                    `<span class="k-word-fill"><span class="k-word-fill-inner">${w.word}</span></span>` +
+                    `</span> `;
+        });
+        contentEl.innerHTML = html;
 
-    contentEl.innerHTML = html;
+        if (state.fontName) {
+            contentEl.querySelectorAll(".k-word-base, .k-word-fill-inner").forEach(el => {
+                el.style.fontFamily = state.fontName;
+            });
+        }
 
-    // Smart Auto-Fit per segment
-    const lineNum = container.id === "kLine1" ? 1 : 2;
-    const baseFontSize = (lineNum === 1 ? state.fontSizeLine1 : state.fontSizeLine2) || 52;
-
-    if (state.isAutoFitEnabled !== false) {
-        adjustLineAutoFit(container, lineNum, baseFontSize);
-    } else {
-        contentEl.style.fontSize = `${baseFontSize}px`;
+        const baseFontSize = (state.fontSizeLine1 || state.fontSizeLine2 || 52);
+        const uniformFs = (state.isAutoFitEnabled !== false) ? Math.min(baseFontSize, getSongGlobalSafeFontSize()) : baseFontSize;
+        contentEl.style.fontSize = `${uniformFs}px`;
     }
+
+    // 2. High-performance 60 FPS Progressive Wipe (Update fill width without reflow)
+    const fillEls = contentEl.querySelectorAll(".k-word-fill");
+    words.forEach((w, wIdx) => {
+        const fillEl = fillEls[wIdx];
+        if (!fillEl) return;
+        const wrapEl = fillEl.parentElement;
+        let pct = 0;
+        if (currentTime >= w.end) {
+            pct = 100;
+            if (wrapEl && wrapEl.classList.contains("wiping")) {
+                wrapEl.classList.remove("wiping");
+                wrapEl.classList.add("sung");
+            }
+        } else if (currentTime > w.start) {
+            const dur = Math.max(0.04, w.end - w.start);
+            pct = Math.min(100, Math.max(0, ((currentTime - w.start) / dur) * 100));
+            if (wrapEl && !wrapEl.classList.contains("wiping")) {
+                wrapEl.classList.add("wiping");
+                wrapEl.classList.remove("sung");
+            }
+        } else {
+            pct = 0;
+            if (wrapEl && (wrapEl.classList.contains("wiping") || wrapEl.classList.contains("sung"))) {
+                wrapEl.classList.remove("wiping", "sung");
+            }
+        }
+        fillEl.style.width = `${pct.toFixed(1)}%`;
+    });
 }
 
 
@@ -1974,6 +4014,140 @@ function setupEditor() {
     btnReloadAI.addEventListener("click", () => {
         if (state.currentProject) {
             renderEditorTable(state.currentProject.segments || []);
+        }
+    });
+
+    const btnRealignAcoustic = document.getElementById("btnRealignAcoustic");
+    btnRealignAcoustic?.addEventListener("click", async () => {
+        if (!state.currentProject || !state.currentProject.id) {
+            alert("Vui lòng mở một bài hát trước khi căn lại nhịp!");
+            return;
+        }
+        const projId = state.currentProject.id;
+        const originalText = btnRealignAcoustic.textContent;
+        btnRealignAcoustic.disabled = true;
+        btnRealignAcoustic.textContent = "Đang khớp nhịp AI...";
+
+        try {
+            const resp = await fetch(`/api/realign-lyrics/${projId}`, { method: "POST" });
+            const resData = await resp.json();
+            if (!resp.ok) {
+                throw new Error(resData.detail || "Lỗi khi căn lại nhịp");
+            }
+            if (resData.data && resData.data.segments) {
+                state.currentProject.segments = resData.data.segments;
+                renderEditorTable(state.currentProject.segments);
+                renderLyricJumpList(state.currentProject.segments);
+                alert(`Đã khớp lại chính xác ${resData.data.segments.length} câu theo giọng hát thực tế của ca sĩ!`);
+            }
+        } catch (err) {
+            alert(`Không thể khớp nhịp: ${err.message}`);
+        } finally {
+            btnRealignAcoustic.disabled = false;
+            btnRealignAcoustic.textContent = originalText;
+        }
+    });
+
+    // Gemini Alignment in Studio (Suno AI & New Song Specialist)
+    const btnAlignGemini = document.getElementById("btnAlignGemini");
+    const geminiAlignModal = document.getElementById("geminiAlignModal");
+    const closeGeminiAlignModalBtn = document.getElementById("closeGeminiAlignModalBtn");
+    const cancelGeminiAlignModalBtn = document.getElementById("cancelGeminiAlignModalBtn");
+    const startGeminiAlignBtn = document.getElementById("startGeminiAlignBtn");
+    const geminiAlignLyricsInput = document.getElementById("geminiAlignLyricsInput");
+    const geminiAlignModelSelect = document.getElementById("geminiAlignModelSelect");
+    const geminiAlignStatusMsg = document.getElementById("geminiAlignStatusMsg");
+    const btnCleanSunoLyricsPrompt = document.getElementById("btnCleanSunoLyricsPrompt");
+
+    const openGeminiAlignModal = () => {
+        if (!state.currentProject || !state.currentProject.id) {
+            alert("Vui lòng mở một bài hát trong Studio trước khi dùng tính năng này!");
+            return;
+        }
+        if (geminiAlignLyricsInput) {
+            const segs = state.currentProject.segments || [];
+            if (segs.length > 0) {
+                geminiAlignLyricsInput.value = segs.map(s => s.text || "").filter(Boolean).join("\n");
+            }
+        }
+        if (geminiAlignStatusMsg) {
+            geminiAlignStatusMsg.style.display = "none";
+            geminiAlignStatusMsg.textContent = "";
+        }
+        if (geminiAlignModal) geminiAlignModal.style.display = "flex";
+    };
+
+    btnAlignGemini?.addEventListener("click", openGeminiAlignModal);
+    closeGeminiAlignModalBtn?.addEventListener("click", () => { if (geminiAlignModal) geminiAlignModal.style.display = "none"; });
+    cancelGeminiAlignModalBtn?.addEventListener("click", () => { if (geminiAlignModal) geminiAlignModal.style.display = "none"; });
+
+    btnCleanSunoLyricsPrompt?.addEventListener("click", () => {
+        if (!geminiAlignLyricsInput) return;
+        let text = geminiAlignLyricsInput.value;
+        // Clean square bracket tags like [Verse 1], [Chorus], [Guitar Solo]
+        text = text.replace(/\[(?:verse|chorus|bridge|pre-chorus|post-chorus|hook|intro|outro|solo|instrumental|drop|break|interlude|fade out|ending|refrain|style|bpm|key|vocal)[^\]]*?\]/gi, "");
+        text = text.replace(/\[.*?\]/g, "");
+        text = text.replace(/\((?:verse|chorus|solo|instrumental|intro|outro|bridge)[^\)]*?\)/gi, "");
+        text = text.split("\n").map(l => l.trim()).filter(Boolean).join("\n");
+        geminiAlignLyricsInput.value = text;
+        showToastNotification("Đã lọc sạch các nhãn tag của Suno!");
+    });
+
+    startGeminiAlignBtn?.addEventListener("click", async () => {
+        if (!state.currentProject || !state.currentProject.id) return;
+        const lyrics = geminiAlignLyricsInput ? geminiAlignLyricsInput.value.trim() : "";
+        if (!lyrics) {
+            alert("Vui lòng nhập hoặc dán lời bài hát để Gemini canh nhịp!");
+            return;
+        }
+
+        const model = geminiAlignModelSelect ? geminiAlignModelSelect.value : "gemini-2.5-flash";
+        const projId = state.currentProject.id;
+
+        if (startGeminiAlignBtn) {
+            startGeminiAlignBtn.disabled = true;
+            startGeminiAlignBtn.textContent = "Đang gửi lên Gemini...";
+        }
+        if (geminiAlignStatusMsg) {
+            geminiAlignStatusMsg.style.display = "block";
+            geminiAlignStatusMsg.innerHTML = "🧠 Đang tải file vocal và phân tích nhịp bằng Gemini AI... Vui lòng đợi trong giây lát!";
+        }
+
+        const formData = new FormData();
+        formData.append("custom_lyrics", lyrics);
+        formData.append("model_name", model);
+
+        try {
+            const resp = await fetch(`/api/projects/${projId}/align-gemini`, {
+                method: "POST",
+                body: formData
+            });
+            const data = await resp.json();
+            if (!resp.ok) {
+                throw new Error(data.detail || data.message || "Lỗi khi gọi Gemini AI");
+            }
+
+            if (data.data && data.data.segments) {
+                state.currentProject = data.data;
+                renderEditorTable(state.currentProject.segments);
+                renderLyricJumpList(state.currentProject.segments);
+                if (typeof loadSubtitles === "function") {
+                    loadSubtitles(projId);
+                }
+                showToastNotification(data.message || `Đã khớp nhịp thành công ${data.data.segments.length} câu!`);
+                if (geminiAlignModal) geminiAlignModal.style.display = "none";
+            }
+        } catch (err) {
+            if (geminiAlignStatusMsg) {
+                geminiAlignStatusMsg.style.display = "block";
+                geminiAlignStatusMsg.innerHTML = `⚠️ Lỗi: ${err.message}`;
+            }
+            alert(`Lỗi: ${err.message}`);
+        } finally {
+            if (startGeminiAlignBtn) {
+                startGeminiAlignBtn.disabled = false;
+                startGeminiAlignBtn.textContent = "Bắt Đầu Khớp Nhịp Gemini";
+            }
         }
     });
 
@@ -2071,35 +4245,7 @@ function setupEditor() {
         });
     }
 
-    // Drawer Toggles
-    const btnToggleLyricJump = document.getElementById("btnToggleLyricJump");
-    const btnToggleVisualCustomizer = document.getElementById("btnToggleVisualCustomizer");
-    const lyricJumpDrawer = document.getElementById("lyricJumpDrawer");
-    const stageCustomizerDrawer = document.getElementById("stageCustomizerDrawer");
 
-    btnToggleLyricJump?.addEventListener("click", () => {
-        if (lyricJumpDrawer) {
-            const isHidden = lyricJumpDrawer.style.display === "none";
-            lyricJumpDrawer.style.display = isHidden ? "block" : "none";
-            if (stageCustomizerDrawer) stageCustomizerDrawer.style.display = "none";
-            btnToggleLyricJump.classList.toggle("active", isHidden);
-            btnToggleVisualCustomizer?.classList.remove("active");
-        }
-    });
-
-    btnToggleVisualCustomizer?.addEventListener("click", () => {
-        if (stageCustomizerDrawer) {
-            const isHidden = stageCustomizerDrawer.style.display === "none";
-            stageCustomizerDrawer.style.display = isHidden ? "block" : "none";
-            if (lyricJumpDrawer) lyricJumpDrawer.style.display = "none";
-            btnToggleVisualCustomizer.classList.toggle("active", isHidden);
-            btnToggleLyricJump?.classList.remove("active");
-        }
-    });
-
-    // Quick jump to editor/export
-    document.getElementById("btnGoToEditor")?.addEventListener("click", () => switchTab("editorTab"));
-    document.getElementById("btnGoToExport")?.addEventListener("click", () => switchTab("exportTab"));
 
     // Initialize Tap-to-Sync & Studio Mic
     setupTapToSync();
@@ -2178,6 +4324,7 @@ function renderEditorTable(segments) {
                 <button class="btn-micro-step" onclick="nudgeSingleSegment(${idx}, -50, false)" title="Chữ câu này sớm hơn 50ms">-50ms</button>
                 <button class="btn-micro-step" onclick="nudgeSingleSegment(${idx}, 50, false)" title="Chữ câu này trễ hơn 50ms">+50ms</button>
                 <button class="btn-micro-step" onclick="nudgeSingleSegment(${idx}, 50, true)" title="Đẩy tất cả câu sau +50ms" style="color: var(--gold-accent); border-color: rgba(255, 226, 89, 0.4);">Đẩy sau</button>
+                <button class="btn-micro-step" onclick="deleteSegment(${idx})" title="Xóa câu này" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.4);">Xóa</button>
             </div>
         `;
         tr.appendChild(tdAction);
@@ -2214,11 +4361,12 @@ function renderLyricJumpList(segments) {
                 </div>
             </div>
             <div class="jump-item-text" onclick="playSegmentAudio(${seg.start})" title="Bấm để nhảy tới câu này" style="font-size: 0.9rem; font-weight: 600; cursor: pointer; padding: 4px 0; color: #F1F5F9;">${seg.text}</div>
-            <div class="jump-item-actions" style="display: flex; gap: 4px; margin-top: 6px;">
+            <div class="jump-item-actions" style="display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap;">
                 <button class="btn-micro-step" onclick="playSegmentAudition(${seg.start}, ${seg.end}, false)">Nghe thử</button>
                 <button class="btn-micro-step" onclick="playSegmentAudition(${seg.start}, ${seg.end}, true)">Lặp lại</button>
                 <button class="btn-micro-step" onclick="nudgeSingleSegment(${idx}, -50, false)">-50ms</button>
                 <button class="btn-micro-step" onclick="nudgeSingleSegment(${idx}, 50, false)">+50ms</button>
+                <button class="btn-micro-step" onclick="deleteSegment(${idx})" title="Xóa câu này" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.4);">Xóa</button>
             </div>
         `;
         listEl.appendChild(item);
@@ -2234,7 +4382,7 @@ window.setSegmentRole = function(segIdx, newRole) {
     renderEditorTable(state.currentProject.segments);
     updateKaraokeStage(beatAudio.currentTime);
     saveProjectStageSettings();
-    showToastNotification(`🎭 Đã gán vai câu #${segIdx + 1}: ${newRole === 'male' ? 'Nam' : newRole === 'female' ? 'Nữ' : newRole === 'duet' ? 'Song ca' : 'Chung'}`);
+    showToastNotification(`Đã gán vai câu #${segIdx + 1}: ${newRole === 'male' ? 'Nam' : newRole === 'female' ? 'Nữ' : newRole === 'duet' ? 'Song ca' : 'Chung'}`);
 };
 
 window.playSegmentAudition = function(start, end, loop = false) {
@@ -2377,7 +4525,7 @@ function setupTapToSync() {
 
         tapSyncState.currentIndex++;
         if (tapSyncState.currentIndex >= tapSyncState.queue.length) {
-            showToastNotification("🎉 Đã gõ nhịp hết toàn bộ bài hát!");
+            showToastNotification("Đã gõ nhịp hết toàn bộ bài hát!");
             finishTapSync();
         } else {
             updateTapSyncUI();
@@ -2401,7 +4549,7 @@ function setupTapToSync() {
         renderEditorTable(state.currentProject.segments);
         renderLyricJumpList(state.currentProject.segments);
         handleSaveLyrics();
-        showToastNotification("✅ Đã lưu nhịp mới vào bài hát!");
+        showToastNotification("Đã lưu nhịp mới vào bài hát!");
     }
 
     btnTapBig?.addEventListener("click", registerTap);
@@ -2448,6 +4596,7 @@ function setupStudioMic() {
     const micReverbSlider = document.getElementById("micReverbSlider");
 
     btnToggleMic?.addEventListener("click", async () => {
+        const btnToggleMicMaster = document.getElementById("btnToggleMicMaster");
         if (micStream) {
             micStream.getTracks().forEach(t => t.stop());
             micStream = null;
@@ -2455,7 +4604,11 @@ function setupStudioMic() {
             const toggleText = document.getElementById("micToggleText");
             if (toggleText) toggleText.textContent = "Bật Micro Hát Live";
             if (micLiveIndicator) micLiveIndicator.style.display = "none";
-            showToastNotification("🎤 Đã tắt Micro");
+            if (btnToggleMicMaster) {
+                btnToggleMicMaster.classList.remove("active");
+                btnToggleMicMaster.textContent = "Bật Micro";
+            }
+            showToastNotification("Đã tắt Micro");
             return;
         }
 
@@ -2509,7 +4662,11 @@ function setupStudioMic() {
             const toggleText = document.getElementById("micToggleText");
             if (toggleText) toggleText.textContent = "Tắt Micro Hát Live";
             if (micLiveIndicator) micLiveIndicator.style.display = "inline-block";
-            showToastNotification("🎤 Đã bật Micro Hát Live (Echo & Reverb Studio)!");
+            if (btnToggleMicMaster) {
+                btnToggleMicMaster.classList.add("active");
+                btnToggleMicMaster.textContent = "Tắt Micro";
+            }
+            showToastNotification("Đã bật Micro Hát Live (Echo & Reverb Studio)!");
         } catch (err) {
             console.error("Mic error:", err);
             alert("Không thể truy cập Micro: " + err.message);
@@ -2550,7 +4707,7 @@ function setupStudioMic() {
             if (recBtnText) recBtnText.textContent = "Thu Âm Giọng Hát";
             clearInterval(micRecTimer);
             if (recTimerBadge) recTimerBadge.style.display = "none";
-            showToastNotification("⏹️ Đã hoàn thành bản thu âm!");
+            showToastNotification("Đã hoàn thành bản thu âm!");
             return;
         }
 
@@ -2587,7 +4744,7 @@ function setupStudioMic() {
             }, 1000);
 
             if (beatAudio.paused) beatAudio.play();
-            showToastNotification("🔴 Đang thu âm giọng hát...");
+            showToastNotification("Đang thu âm giọng hát...");
         } catch (err) {
             console.error("Recording error:", err);
             alert("Lỗi thu âm: " + err.message);
@@ -2675,6 +4832,11 @@ async function handleSaveLyrics() {
         const data = await res.json();
         if (res.ok) {
             state.currentProject.segments = updatedSegments;
+            state._memoizedPairs = null;
+            state._memoizedSegsRef = null;
+            state._cachedSongSafeSize = null;
+            state._cachedSongSafeSizeSegsRef = null;
+            updateKaraokeStage(beatAudio.currentTime);
             alert("Đã cập nhật lời và phụ đề Karaoke thành công!");
         } else {
             alert(`Lỗi: ${data.detail}`);
@@ -2689,9 +4851,6 @@ async function handleSaveLyrics() {
    7. VIDEO EXPORT & CUSTOMIZER
    ======================================================== */
 function setupExport() {
-    // Visual Customizer Drawer & Stage Theme Controls
-    const btnToggleVisualCustomizer = document.getElementById("btnToggleVisualCustomizer");
-    const stageCustomizerDrawer = document.getElementById("stageCustomizerDrawer");
     const stageFontSelect = document.getElementById("stageFontSelect");
     const exportFontSelect = document.getElementById("exportFontSelect");
     const stageFontSizeSlider = document.getElementById("stageFontSizeSlider");
@@ -2701,18 +4860,15 @@ function setupExport() {
     const stageBgFileInput = document.getElementById("stageBgFileInput");
     const stageScreen = document.getElementById("stageScreen") || document.getElementById("karaokeScreen");
 
-    btnToggleVisualCustomizer?.addEventListener("click", () => {
-        if (stageCustomizerDrawer) {
-            const isHidden = stageCustomizerDrawer.style.display === "none";
-            stageCustomizerDrawer.style.display = isHidden ? "block" : "none";
-        }
-    });
-
     // Font change
     function updateStageFont(fontFamily, fontNameClean) {
-        if (kLine1) kLine1.style.fontFamily = fontFamily;
-        if (kLine2) kLine2.style.fontFamily = fontFamily;
-        if (stageFontSelect && stageFontSelect.value !== fontFamily) stageFontSelect.value = fontFamily;
+        if (typeof applyStageFont === "function") {
+            applyStageFont(fontFamily);
+        } else {
+            if (kLine1) kLine1.style.fontFamily = fontFamily;
+            if (kLine2) kLine2.style.fontFamily = fontFamily;
+            if (stageFontSelect && stageFontSelect.value !== fontFamily) stageFontSelect.value = fontFamily;
+        }
         if (exportFontSelect && exportFontSelect.value !== fontNameClean) exportFontSelect.value = fontNameClean;
     }
 
@@ -2803,61 +4959,123 @@ function setupExport() {
         }
     });
 
-    // Theme buttons in Export Tab
-    themeBtns.forEach(btn => {
-        btn.addEventListener("click", () => {
-            themeBtns.forEach(b => b.classList.remove("active"));
-            btn.classList.add("active");
-            const theme = btn.dataset.theme;
-            applyThemeColors(theme);
+    // 1. Stage Screen Floating Color Dock listeners (Chỉnh màu ngay trên màn hình)
+    document.querySelectorAll(".stage-color-dot").forEach(dot => {
+        dot.addEventListener("click", () => {
+            applyStageActiveColor(dot.dataset.color);
         });
     });
-
-    // Custom Background Upload in Export Tab
-    btnSelectBgFile?.addEventListener("click", () => bgFileInput.click());
-    bgFileInput?.addEventListener("change", async (e) => {
-        if (e.target.files.length > 0 && state.currentProject) {
-            const file = e.target.files[0];
-            const formData = new FormData();
-            formData.append("file", file);
-
-            bgStatusText.textContent = `Đang tải: ${file.name}...`;
-
-            try {
-                const res = await fetch(`/api/upload-background/${state.currentProject.id}`, {
-                    method: "POST",
-                    body: formData
-                });
-                const data = await res.json();
-                if (res.ok) {
-                    state.customBgPath = data.url;
-                    bgStatusText.textContent = `Đã chọn nền: ${file.name}`;
-                    bgStatusText.style.color = "var(--green-accent)";
-                } else {
-                    bgStatusText.textContent = `Lỗi: ${data.detail}`;
-                }
-            } catch (err) {
-                bgStatusText.textContent = `Lỗi tải lên: ${err.message}`;
-            }
-        }
+    document.getElementById("stageColorPickerInput")?.addEventListener("input", (e) => {
+        applyStageActiveColor(e.target.value);
     });
 
-    btnStartRender.addEventListener("click", handleStartRender);
+    // 2. Drawer Color Chips listeners
+    document.querySelectorAll(".drawer-color-chip").forEach(chip => {
+        chip.addEventListener("click", () => {
+            applyStageActiveColor(chip.dataset.color);
+        });
+    });
+    document.getElementById("drawerColorPickerInput")?.addEventListener("input", (e) => {
+        applyStageActiveColor(e.target.value);
+    });
+
+    // 3. Initialize default color & summary
+    applyStageActiveColor(state.colorActive || "#0018F5");
+    updateExportSummary();
+
+    btnStartRender?.addEventListener("click", handleStartRender);
 }
 
-function applyThemeColors(theme) {
-    if (theme === "gold") {
-        colorInactive.value = "#ffffff";
-        colorActive.value = "#FFE259";
-    } else if (theme === "cyan") {
-        colorInactive.value = "#ffffff";
-        colorActive.value = "#00F2FE";
-    } else if (theme === "pink") {
-        colorInactive.value = "#ffffff";
-        colorActive.value = "#FF758C";
-    } else if (theme === "white") {
-        colorInactive.value = "#888888";
-        colorActive.value = "#FFFFFF";
+function applyStageActiveColor(colorHex) {
+    if (!colorHex) return;
+    state.colorActive = colorHex;
+
+    // 1. Set CSS variables on stageScreen
+    const stageScreen = document.getElementById("stageScreen") || document.getElementById("karaokeScreen");
+    if (stageScreen) {
+        stageScreen.style.setProperty("--stage-color-active", colorHex);
+        const hex = colorHex.replace("#", "");
+        const r = parseInt(hex.substring(0, 2), 16) || 0;
+        const g = parseInt(hex.substring(2, 4), 16) || 0;
+        const b = parseInt(hex.substring(4, 6), 16) || 0;
+        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+        if (lum < 160) {
+            // Dark / Saturated like KTV Royal Blue: White outline + Black drop shadow
+            stageScreen.style.setProperty("--stage-stroke-active", "3px #ffffff");
+            stageScreen.style.setProperty("--stage-shadow-active", "drop-shadow(2px 3px 0px #000000)");
+        } else {
+            // Light color (Yellow, White): Black outline + Black drop shadow
+            stageScreen.style.setProperty("--stage-stroke-active", "2.5px #000000");
+            stageScreen.style.setProperty("--stage-shadow-active", "drop-shadow(2px 3px 0px #000000)");
+        }
+    }
+
+    // 2. Sync Screen floating toolbar dots
+    document.querySelectorAll(".stage-color-dot").forEach(dot => {
+        const dotColor = (dot.dataset.color || "").toUpperCase();
+        dot.classList.toggle("active", dotColor === colorHex.toUpperCase());
+    });
+    const stagePicker = document.getElementById("stageColorPickerInput");
+    if (stagePicker && stagePicker.value.toUpperCase() !== colorHex.toUpperCase()) {
+        stagePicker.value = colorHex;
+    }
+
+    // 3. Sync Drawer color chips
+    document.querySelectorAll(".drawer-color-chip").forEach(chip => {
+        const chipColor = (chip.dataset.color || "").toUpperCase();
+        chip.classList.toggle("active", chipColor === colorHex.toUpperCase());
+    });
+    const drawerPicker = document.getElementById("drawerColorPickerInput");
+    if (drawerPicker && drawerPicker.value.toUpperCase() !== colorHex.toUpperCase()) {
+        drawerPicker.value = colorHex;
+    }
+
+    // 4. Update Export summary badge
+    updateExportSummary();
+}
+
+function updateExportSummary() {
+    const fontEl = document.getElementById("exportSummaryFont");
+    const sizeEl = document.getElementById("exportSummarySize");
+    const colorDot = document.getElementById("exportSummaryColorDot");
+    const colorText = document.getElementById("exportSummaryColorText");
+    const layoutEl = document.getElementById("exportSummaryLayout");
+
+    if (fontEl) {
+        const fontName = state.fontName ? state.fontName.replace(/['"]/g, "").split(",")[0].trim() : "Outfit";
+        fontEl.textContent = fontName;
+    }
+    if (sizeEl) {
+        const fs = state.fontSizeLine1 || state.fontSizeLine2 || 52;
+        sizeEl.textContent = `${fs}px`;
+    }
+    if (colorDot && colorText) {
+        const c = state.colorActive || "#0018F5";
+        colorDot.style.background = c;
+        const knownColors = {
+            "#0018F5": "Xanh KTV Chuẩn",
+            "#0022FF": "Xanh KTV Chuẩn",
+            "#0000FF": "Xanh KTV Chuẩn",
+            "#FFE259": "Vàng Gold",
+            "#00F2FE": "Xanh Cyan",
+            "#FF758C": "Hồng Neon",
+            "#FFFFFF": "Trắng Minimal",
+            "#FFA751": "Cam Sunset",
+            "#10B981": "Xanh Emerald"
+        };
+        colorText.textContent = knownColors[c.toUpperCase()] || c;
+    }
+    if (layoutEl) {
+        layoutEl.textContent = (state.layoutPreset === "staggered") ? "So Le Trái - Phải" : "Căn Giữa 16:9";
+    }
+    const toneEl = document.getElementById("exportSummaryTone");
+    if (toneEl) {
+        const pitch = state.currentPitchSemitones || 0;
+        if (pitch === 0) {
+            toneEl.textContent = "Gốc (0)";
+        } else {
+            toneEl.textContent = `${pitch > 0 ? '+' : ''}${pitch} Tone`;
+        }
     }
 }
 
@@ -2868,11 +5086,11 @@ async function handleStartRender() {
     }
 
     const projectId = state.currentProject.id;
-    const resolution = videoResolutionSelect.value;
-    const fontName = exportFontSelect ? exportFontSelect.value : "Outfit";
+    const resolution = videoResolutionSelect ? videoResolutionSelect.value : "1920x1080";
+    const fontName = state.fontName ? state.fontName.replace(/['"]/g, "").split(",")[0].trim() : "Outfit";
     const fontSize = state.fontSizeLine1 || state.fontSizeLine2 || 54;
-    const primColor = hexToAssColor(colorInactive.value);
-    const sungColor = hexToAssColor(colorActive.value);
+    const primColor = hexToAssColor(state.colorInactive || "#ffffff");
+    const sungColor = hexToAssColor(state.colorActive || "#0018F5");
 
     btnStartRender.disabled = true;
     btnStartRender.innerHTML = `<span>Đang xuất video (${fontName} - GPU NVENC)...</span>`;
@@ -2887,6 +5105,7 @@ async function handleStartRender() {
                 font_size: fontSize,
                 primary_color: primColor,
                 karaoke_color: sungColor,
+                pitch_semitones: state.currentPitchSemitones || 0,
                 line1_pos_x: state.line1PosX !== undefined ? state.line1PosX : 0.50,
                 line2_pos_x: state.line2PosX !== undefined ? state.line2PosX : 0.50,
                 line1_pos_y: state.line1PosY !== undefined ? state.line1PosY : 0.58,
@@ -2895,7 +5114,8 @@ async function handleStartRender() {
                 font_size_line2: state.fontSizeLine2 || 56,
                 align_line1: state.line1Align || "center",
                 align_line2: state.line2Align || "center",
-                layout_preset: state.layoutPreset || "center"
+                layout_preset: state.layoutPreset || "center",
+                display_mode: state.stageDisplayMode || "pingpong"
             })
         });
 
@@ -2958,11 +5178,11 @@ function renderProjectsGrid() {
         const card = document.createElement("div");
         card.className = "project-card";
         card.innerHTML = `
-            <div class="p-title" title="${p.title}">🎵 ${p.title}</div>
+            <div class="p-title" title="${p.title}">${p.title}</div>
             <div class="p-meta">Thời lượng: ${formatTime(p.duration)} • Ngôn ngữ: ${(p.language || 'vi').toUpperCase()}</div>
             <div class="p-actions">
-                <button class="btn-primary btn-sm" onclick="loadExistingProject('${p.id}')">▶ Mở Phòng Thu</button>
-                ${p.video_url ? `<a href="${p.video_url}" class="btn-secondary btn-sm" download>🎬 Tải MP4</a>` : ''}
+                <button class="btn-primary btn-sm" onclick="loadExistingProject('${p.id}')">Mở Phòng Thu</button>
+                ${p.video_url ? `<a href="${p.video_url}" class="btn-secondary btn-sm" download>Tải MP4</a>` : ''}
             </div>
         `;
         projectsGrid.appendChild(card);
@@ -3176,6 +5396,43 @@ async function confirmDeleteProject(projectId, encodedTitle) {
     const confirmed = confirm(`BẠN CÓ CHẮC MUỐN XÓA BÀI HÁT NÀY?\n\n"${title}"\n\nToàn bộ file beat, vocal tách rời và phụ đề liên quan sẽ được xóa vĩnh viễn khỏi máy tính.`);
     if (!confirmed) return;
 
+    // 1. GIẢI PHÓNG TOÀN BỘ FILE HANDLE / MEDIA STREAM TRONG TRÌNH DUYỆT NGAY LẬP TỨC
+    // Tránh lỗi Windows [WinError 32] khi file âm thanh/video đang được trình duyệt mở
+    const isCurrentActive = state.currentProject && (state.currentProject.id === projectId);
+    const isBeatLoaded = beatAudio.src && beatAudio.src.includes(projectId);
+    const isVocalLoaded = vocalAudio.src && vocalAudio.src.includes(projectId);
+    const isVideoLoaded = renderedVideoPlayer && renderedVideoPlayer.src && renderedVideoPlayer.src.includes(projectId);
+
+    if (isCurrentActive || isBeatLoaded || isVocalLoaded || isVideoLoaded) {
+        beatAudio.pause();
+        beatAudio.removeAttribute("src");
+        beatAudio.load();
+
+        vocalAudio.pause();
+        vocalAudio.removeAttribute("src");
+        vocalAudio.load();
+
+        if (renderedVideoPlayer) {
+            renderedVideoPlayer.pause();
+            renderedVideoPlayer.removeAttribute("src");
+            renderedVideoPlayer.load();
+            renderedVideoPlayer.style.display = "none";
+            if (emptyVideoPlaceholder) emptyVideoPlaceholder.style.display = "flex";
+        }
+
+        if (isCurrentActive) {
+            state.currentProject = null;
+            state.isPlaying = false;
+            const playPauseBtn = document.getElementById("playPauseBtn");
+            if (playPauseBtn) playPauseBtn.textContent = "Phát";
+            const songTitle = document.getElementById("songTitle");
+            if (songTitle) songTitle.textContent = "Chưa chọn bài hát";
+        }
+
+        // Chờ 150ms để trình duyệt đóng socket và Windows giải phóng file descriptor
+        await new Promise(resolve => setTimeout(resolve, 150));
+    }
+
     try {
         const res = await fetch(`/api/project/${projectId}`, {
             method: "DELETE"
@@ -3192,13 +5449,6 @@ async function confirmDeleteProject(projectId, encodedTitle) {
             }
 
             setTimeout(() => {
-                // If currently playing the deleted song, reset player
-                if (state.currentProject && state.currentProject.id === projectId) {
-                    beatAudio.pause();
-                    vocalAudio.pause();
-                    state.currentProject = null;
-                    document.getElementById("songTitle").textContent = "Chưa chọn bài hát";
-                }
                 loadProjectsList();
             }, 300);
         } else {
@@ -3218,4 +5468,31 @@ btnRefreshLibrary?.addEventListener("click", () => {
         }, 400);
     });
 });
+
+// Attach Clear Cache button handler
+const btnClearCache = document.getElementById("btnClearCache");
+btnClearCache?.addEventListener("click", async () => {
+    if (!confirm("Bạn có chắc chắn muốn xóa toàn bộ bộ nhớ đệm (cache beat & lời) để giải phóng ổ cứng không?")) {
+        return;
+    }
+    const originalText = btnClearCache.textContent;
+    btnClearCache.textContent = "Đang xóa...";
+    btnClearCache.disabled = true;
+    try {
+        const res = await fetch("/api/clear-cache", { method: "POST" });
+        const data = await res.json();
+        if (res.ok && data.status === "success") {
+            try { sessionStorage.clear(); } catch (e) {}
+            alert(data.message || "Đã xóa sạch cache thành công!");
+        } else {
+            alert("Lỗi khi xóa cache: " + (data.detail || data.message || "Unknown error"));
+        }
+    } catch (e) {
+        alert("Lỗi kết nối máy chủ: " + e.message);
+    } finally {
+        btnClearCache.textContent = originalText;
+        btnClearCache.disabled = false;
+    }
+});
+
 

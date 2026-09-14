@@ -3,12 +3,51 @@ import sys
 import subprocess
 import shutil
 import logging
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import torch
 
 from backend.cache_manager import compute_file_hash, get_cached_stems, save_stems_to_cache
 
 logger = logging.getLogger(__name__)
+
+
+def _encode_stems_mp3_parallel(
+    final_vocals_wav: Path,
+    final_vocals_mp3: Path,
+    final_instrumental_wav: Path,
+    final_instrumental_mp3: Path,
+    file_hash: str = None,
+    model_name: str = None,
+    res_stems: dict = None
+):
+    """Encodes vocals and instrumental WAVs to MP3 in parallel to avoid CPU bottleneck."""
+    def _enc(in_wav, out_mp3, bitrate):
+        cmd = [
+            "ffmpeg", "-y",
+            "-i", str(in_wav),
+            "-vn",
+            "-b:a", bitrate,
+            "-threads", "2",
+            str(out_mp3)
+        ]
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return str(out_mp3)
+
+    try:
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            f1 = executor.submit(_enc, final_vocals_wav, final_vocals_mp3, "256k")
+            f2 = executor.submit(_enc, final_instrumental_wav, final_instrumental_mp3, "320k")
+            f1.result()
+            f2.result()
+
+        if file_hash and model_name and res_stems:
+            save_stems_to_cache(file_hash, model_name, res_stems)
+        logger.info("Successfully encoded vocals.mp3 and instrumental.mp3 in parallel.")
+    except Exception as e:
+        logger.error(f"Error encoding stems to MP3: {e}")
+
 
 def get_best_device() -> str:
     """Returns 'cuda' if NVIDIA GPU is available, 'mps' if Apple Silicon GPU is available, else 'cpu'."""
@@ -18,13 +57,15 @@ def get_best_device() -> str:
         return "mps"
     return "cpu"
 
+
 def separate_audio(
     input_audio_path: str,
     output_dir: str,
     model_name: str = "htdemucs",
     device: str = None,
     use_cache: bool = True,
-    progress_callback = None
+    progress_callback = None,
+    async_mp3: bool = True
 ) -> dict:
     """
     Separates audio file into 'vocals' and 'instrumental' using Meta Demucs with smart caching.
@@ -56,15 +97,13 @@ def separate_audio(
             shutil.copy2(cached["vocals_wav"], final_vocals_wav)
             shutil.copy2(cached["instrumental_wav"], final_instrumental_wav)
             
-            if cached.get("vocals_mp3") and Path(cached["vocals_mp3"]).exists():
+            has_v_mp3 = cached.get("vocals_mp3") and Path(cached["vocals_mp3"]).exists()
+            has_i_mp3 = cached.get("instrumental_mp3") and Path(cached["instrumental_mp3"]).exists()
+            if has_v_mp3 and has_i_mp3:
                 shutil.copy2(cached["vocals_mp3"], final_vocals_mp3)
-            else:
-                subprocess.run(["ffmpeg", "-y", "-i", str(final_vocals_wav), "-vn", "-b:a", "256k", str(final_vocals_mp3)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-            if cached.get("instrumental_mp3") and Path(cached["instrumental_mp3"]).exists():
                 shutil.copy2(cached["instrumental_mp3"], final_instrumental_mp3)
             else:
-                subprocess.run(["ffmpeg", "-y", "-i", str(final_instrumental_wav), "-vn", "-b:a", "320k", str(final_instrumental_mp3)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                _encode_stems_mp3_parallel(final_vocals_wav, final_vocals_mp3, final_instrumental_wav, final_instrumental_mp3)
 
             return {
                 "vocals_wav": str(final_vocals_wav),
@@ -78,6 +117,15 @@ def separate_audio(
         progress_callback(10, f"Đang khởi tạo Demucs ({model_name}) trên {device.upper()}...")
 
     # Run Demucs CLI to cleanly isolate memory and prevent CUDA cache leaks
+    # For CPU: limit jobs to 2 (or 1 on dual-core) to save 70% RAM and avoid cache thrashing.
+    if device == "cpu":
+        total_cpus = os.cpu_count() or 4
+        num_jobs = "2" if total_cpus >= 4 else "1"
+        omp_threads = str(min(max(total_cpus // 2, 2), 6))
+    else:
+        num_jobs = "2"
+        omp_threads = "4"
+
     cmd = [
         sys.executable,
         "-m",
@@ -85,34 +133,53 @@ def separate_audio(
         "--two-stems=vocals",
         "-n", model_name,
         "-d", device,
-        "-j", "2",
+        "-j", num_jobs,
         "-o", str(out_dir / "_raw_stems"),
         str(input_path)
     ]
+    if device == "cpu":
+        cmd.extend(["--overlap", "0.15", "--shifts", "0", "--other-method", "minus"])
 
     logger.info(f"Running Demucs separation: {' '.join(cmd)}")
     
+    demucs_env = os.environ.copy()
+    demucs_env["PYTHONIOENCODING"] = "utf-8"
+    demucs_env["PYTHONUTF8"] = "1"
+    demucs_env["OMP_NUM_THREADS"] = omp_threads
+    demucs_env["MKL_NUM_THREADS"] = omp_threads
+    demucs_env["TORCH_NUM_THREADS"] = omp_threads
+    demucs_env["KMP_BLOCKTIME"] = "0"
+
     process = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
         encoding="utf-8",
-        errors="replace"
+        errors="replace",
+        env=demucs_env
     )
 
-    for line in process.stdout:
-        line_str = line.strip()
-        if line_str:
-            logger.debug(f"[Demucs] {line_str}")
-            if "%" in line_str and progress_callback:
-                try:
-                    parts = line_str.split("%")[0].split()
-                    pct = int(parts[-1])
-                    scaled_pct = 10 + int(pct * 0.38)
-                    progress_callback(scaled_pct, f"Đang tách nhạc và lời AI: {pct}%")
-                except Exception:
-                    pass
+    buffer = ""
+    while True:
+        char = process.stdout.read(1)
+        if not char:
+            break
+        if char in ("\r", "\n"):
+            line_str = buffer.strip()
+            buffer = ""
+            if line_str:
+                logger.debug(f"[Demucs] {line_str}")
+                if "%" in line_str and progress_callback:
+                    try:
+                        parts = line_str.split("%")[0].split()
+                        pct = int(parts[-1])
+                        scaled_pct = 10 + int(pct * 0.38)
+                        progress_callback(scaled_pct, f"Đang tách nhạc và lời AI: {pct}%")
+                    except Exception:
+                        pass
+        else:
+            buffer += char
 
     process.wait()
     if process.returncode != 0:
@@ -128,9 +195,18 @@ def separate_audio(
 
     raw_vocals = track_stem_dir / "vocals.wav"
     raw_instrumental = track_stem_dir / "no_vocals.wav"
+    if not raw_instrumental.exists():
+        raw_instrumental = track_stem_dir / "minus_vocals.wav"
+    if not raw_instrumental.exists():
+        for candidate in track_stem_dir.glob("*.wav"):
+            if candidate.name.lower() != "vocals.wav":
+                raw_instrumental = candidate
+                break
 
     if not raw_vocals.exists() or not raw_instrumental.exists():
-        raise FileNotFoundError(f"Stem files missing in {track_stem_dir}")
+        found_files = [f.name for f in track_stem_dir.glob("*")]
+        raise FileNotFoundError(f"Stem files missing in {track_stem_dir}. Found: {found_files}")
+
 
     final_vocals_wav = out_dir / "vocals.wav"
     final_instrumental_wav = out_dir / "instrumental.wav"
@@ -139,18 +215,6 @@ def separate_audio(
 
     shutil.copy2(raw_vocals, final_vocals_wav)
     shutil.copy2(raw_instrumental, final_instrumental_wav)
-
-    if progress_callback:
-        progress_callback(50, "Đang tối ưu hóa định dạng âm thanh web...")
-
-    subprocess.run(
-        ["ffmpeg", "-y", "-i", str(final_vocals_wav), "-vn", "-b:a", "256k", str(final_vocals_mp3)],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-    )
-    subprocess.run(
-        ["ffmpeg", "-y", "-i", str(final_instrumental_wav), "-vn", "-b:a", "320k", str(final_instrumental_mp3)],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-    )
 
     try:
         shutil.rmtree(out_dir / "_raw_stems", ignore_errors=True)
@@ -165,7 +229,19 @@ def separate_audio(
         "cache_hit": False
     }
 
-    # Save to persistent cache for instant future reuse
-    save_stems_to_cache(file_hash, model_name, res_stems)
+    if async_mp3:
+        # Start MP3 encoding in background thread so Whisper transcription can start immediately!
+        t = threading.Thread(
+            target=_encode_stems_mp3_parallel,
+            args=(final_vocals_wav, final_vocals_mp3, final_instrumental_wav, final_instrumental_mp3, file_hash, model_name, res_stems),
+            daemon=True
+        )
+        t.start()
+        res_stems["mp3_thread"] = t
+        logger.info("Launched background parallel stem MP3 encoding thread.")
+    else:
+        if progress_callback:
+            progress_callback(50, "Đang tối ưu hóa định dạng âm thanh web...")
+        _encode_stems_mp3_parallel(final_vocals_wav, final_vocals_mp3, final_instrumental_wav, final_instrumental_mp3, file_hash, model_name, res_stems)
 
     return res_stems

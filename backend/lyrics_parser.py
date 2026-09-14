@@ -19,6 +19,10 @@ def parse_lrc_to_segments(lrc_text: str) -> List[Dict[str, Any]]:
             ms_val = int(ms_str) * 10 if len(ms_str) == 2 else int(ms_str[:3])
             total_sec = min_val * 60 + sec_val + ms_val / 1000.0
             text = m.group(4).strip()
+            # Clean parenthesized backing vocal annotations, e.g. "(đi tìm theo học đàn)" or "[hát 2 lần]"
+            text = re.sub(r"\(.*?\)", "", text)
+            text = re.sub(r"\[.*?\]", "", text)
+            text = re.sub(r"\s+", " ", text).strip()
             if text:
                 lrc_entries.append({"time": round(total_sec, 3), "text": text})
 
@@ -86,20 +90,14 @@ def parse_srt_to_segments(srt_text: str) -> List[Dict[str, Any]]:
                 end_sec = g[4]*3600 + g[5]*60 + g[6] + g[7]/1000.0
                 
                 full_text = " ".join(text_lines)
+                full_text = re.sub(r"\(.*?\)", "", full_text)
+                full_text = re.sub(r"\[.*?\]", "", full_text)
+                full_text = re.sub(r"\s+", " ", full_text).strip()
+                if not full_text:
+                    continue
                 words = full_text.split()
-                dur = max(0.2, end_sec - start_sec)
-                dur_per_word = dur / max(1, len(words))
-                
-                words_data = []
-                for w_idx, w in enumerate(words):
-                    w_start = round(start_sec + w_idx * dur_per_word, 3)
-                    w_end = round(min(end_sec, w_start + dur_per_word), 3)
-                    words_data.append({
-                        "word": w,
-                        "start": w_start,
-                        "end": w_end,
-                        "probability": 1.0
-                    })
+                from backend.gemini_service import distribute_words_in_timespan
+                words_data = distribute_words_in_timespan(words, start_sec, end_sec)
 
                 segments.append({
                     "id": seg_idx,
@@ -110,4 +108,13 @@ def parse_srt_to_segments(srt_text: str) -> List[Dict[str, Any]]:
                 })
                 seg_idx += 1
 
-    return segments
+    try:
+        from backend.acoustic_aligner import split_long_segment_data
+        split_segments = []
+        for s in segments:
+            split_segments.extend(split_long_segment_data(s, max_words=8, max_chars=38, max_duration=5.5))
+        for idx, s in enumerate(split_segments):
+            s["id"] = idx
+        return split_segments
+    except Exception:
+        return segments
