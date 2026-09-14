@@ -1820,6 +1820,17 @@ async def gemini_video_to_srt(
             pass
 
 
+@app.get("/api/download-package")
+@app.get("/download-zip")
+async def download_package_zip():
+    pkg_path = BASE_DIR / "AI_Karaoke_Studio_v1.0.000.zip"
+    if not pkg_path.exists():
+        raise HTTPException(status_code=404, detail="Bản nén chưa sẵn sàng.")
+    return FileResponse(
+        str(pkg_path),
+        media_type="application/zip",
+        filename="AI_Karaoke_Studio_v1.0.000.zip"
+    )
 
 
 if __name__ == "__main__":
