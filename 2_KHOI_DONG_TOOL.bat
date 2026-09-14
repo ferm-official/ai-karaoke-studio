@@ -8,13 +8,30 @@ echo          AI KARAOKE STUDIO PRO - 100%% LOCAL AI POWERED
 echo =======================================================================
 echo.
 
-set PYTHON_BIN=python
-if exist "venv\Scripts\python.exe" (
-    echo [*] Su dung moi truong ao: venv
-    set PYTHON_BIN=venv\Scripts\python.exe
-) else (
-    echo [*] Chua thay thu muc venv, su dung Python he thong...
+if not exist "venv\Scripts\python.exe" (
+    echo =======================================================================
+    echo [CHU Y] BAN CHUA CAI DAT MOI TRUONG AO VENV CHO TOOL!
+    echo =======================================================================
+    echo.
+    echo Truoc khi su dung lan dau, he thong can thiet lap moi truong AI
+    echo bang cach chay file: 1_CAI_DAT_MOI_TRUONG.bat
+    echo.
+    echo Nhan phim bat ky de BAT DAU CAI DAT MOI TRUONG ngay bay gio...
+    echo (Hoac dong cua so nay neu ban muon chay sau)
+    echo =======================================================================
+    echo.
+    pause
+    call 1_CAI_DAT_MOI_TRUONG.bat
+    if not exist "venv\Scripts\python.exe" (
+        echo.
+        echo [THONG BAO] Moi truong venv chua duoc tao xong. Khong the khoi dong.
+        pause
+        exit /b 1
+    )
 )
+
+echo [*] Su dung moi truong ao: venv
+set PYTHON_BIN=venv\Scripts\python.exe
 
 echo [*] Dang khoi dong AI Karaoke Studio Server...
 echo [*] Dang mo giao dien tai: http://127.0.0.1:8008
