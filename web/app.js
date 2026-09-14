@@ -180,10 +180,10 @@ async function fetchSystemInfo() {
                 hwGpuBtn.classList.remove("active");
                 hwGpuBtn.style.opacity = "0.6";
                 const gpuSub = hwGpuBtn.querySelector(".hw-sub");
-                if (gpuSub) gpuSub.textContent = "Máy không có card rời NVIDIA • Đang tối ưu CPU";
+                if (gpuSub) gpuSub.textContent = "Máy không có card rời NVIDIA • Đã kích hoạt Chế Độ CPU Siêu Tốc";
             }
             if (whisperModelSelect) {
-                whisperModelSelect.value = "small";
+                whisperModelSelect.value = data.recommended_whisper || "tiny";
             }
         }
     } catch (e) {

@@ -245,8 +245,8 @@
                                 </button>
                                 <button type="button" class="hw-mode-btn" id="hwCpuBtn" data-mode="cpu">
                                     <div class="hw-info">
-                                        <span class="hw-title">Chế Độ CPU (Đa Luồng AVX)</span>
-                                        <span class="hw-sub">Tương thích 100% mọi máy • Nhường GPU cho tác vụ khác</span>
+                                        <span class="hw-title">Chế Độ CPU (Tối Ưu Siêu Tốc AVX)</span>
+                                        <span class="hw-sub">Tự động tối ưu Intel P-Core & QuickSync • Máy yếu chạy êm mát</span>
                                     </div>
                                 </button>
                             </div>
@@ -270,9 +270,11 @@
                         <div class="form-group">
                             <label class="input-label" for="whisperModelSelect">Mô hình AI Canh Nhịp Lời (Whisper)</label>
                             <select id="whisperModelSelect" class="select-input">
-                                <option value="large-v3" selected>Large-v3 (Chính xác nhất từng từ, khuyên dùng)</option>
-                                <option value="medium">Medium (Cân bằng tốc độ và độ chính xác)</option>
-                                <option value="small">Small (Tốc độ siêu nhanh)</option>
+                                <option value="tiny">Tiny (Siêu Tốc ~3s • Khuyên dùng cho máy yếu / Đã có lời)</option>
+                                <option value="base">Base (Rất Nhanh ~8s • Cân bằng máy yếu)</option>
+                                <option value="small">Small (Chuẩn Tốc Độ • Phù hợp CPU & GPU nhẹ)</option>
+                                <option value="medium">Medium (Chính Xác Cao • Khuyên dùng cho GPU)</option>
+                                <option value="large-v3" selected>Large-v3 (Độ chính xác cao nhất • Khuyên dùng cho GPU RTX)</option>
                             </select>
                         </div>
 

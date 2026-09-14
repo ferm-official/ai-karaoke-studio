@@ -1,6 +1,7 @@
 import os
 os.environ["PYTHONIOENCODING"] = "utf-8"
 os.environ["PYTHONUTF8"] = "1"
+os.environ["HF_HUB_DISABLE_SYMLINKS"] = "1"
 import sys
 import uuid
 import json
@@ -201,8 +202,12 @@ def run_pipeline_task(
         if transcription_engine != "gemini":
             effective_model = model_size
             if whisper_device == "cpu" and model_size in ["large-v3", "large"]:
-                logger.warning(f"[{project_id}] Whisper large-v3 on CPU detected. Using 'small' model to prevent CPU quantization hallucinations.")
-                effective_model = "small"
+                if official_text_lines or parsed_synced_segments:
+                    logger.info(f"[{project_id}] CPU Mode with known lyrics -> Using 'tiny' (~3s) for ultra-fast boundary detection.")
+                    effective_model = "tiny"
+                else:
+                    logger.info(f"[{project_id}] CPU Mode without lyrics -> Using 'base' (~8s) for balanced speed and accuracy.")
+                    effective_model = "base"
 
             update_progress(55, f"Đang nhận diện giọng hát thực tế trên {hw_label} bằng Faster-Whisper AI ({effective_model})...")
             transcription = transcribe_vocals(
@@ -432,13 +437,18 @@ async def get_system_info():
         engine_str = "Meta Demucs v4 (CPU Optimized) + Faster-Whisper (int8)"
         gpu_available = False
 
+    recommended_profile = "gpu_studio" if (has_cuda or (is_macos and has_mps)) else ("intel_qsv_fast" if has_qsv else "cpu_fast")
+    recommended_whisper = "large-v3" if (has_cuda or (is_macos and has_mps)) else "tiny"
+
     return {
         "cuda_available": gpu_available,
         "has_qsv": has_qsv,
         "gpu_name": gpu_name,
         "vram_gb": vram_gb,
         "engine": engine_str,
-        "os_platform": sys.platform
+        "os_platform": sys.platform,
+        "recommended_profile": recommended_profile,
+        "recommended_whisper": recommended_whisper
     }
 
 

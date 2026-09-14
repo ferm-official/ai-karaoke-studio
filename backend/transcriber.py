@@ -1,4 +1,5 @@
 import os
+os.environ["HF_HUB_DISABLE_SYMLINKS"] = "1"
 import re
 import subprocess
 import logging
@@ -122,7 +123,15 @@ def transcribe_vocals(
                 progress_callback(78, "⚡ Tìm thấy nhịp lời trong Cache! Nạp tức thì (0.05s)...")
             return cached
 
-    size_desc = "~460MB" if "small" in model_size else ("~1.5GB" if "medium" in model_size else "~3.1GB")
+    size_desc = (
+        "~75MB (Siêu Tốc ~3s)" if "tiny" in model_size else (
+            "~145MB (Nhanh ~8s)" if "base" in model_size else (
+                "~460MB" if "small" in model_size else (
+                    "~1.5GB" if "medium" in model_size else "~3.1GB"
+                )
+            )
+        )
+    )
     if progress_callback:
         progress_callback(55, f"Đang nạp AI Whisper ({model_size} {size_desc}). Lần đầu chạy sẽ tải từ máy chủ ({size_desc}), vui lòng đợi...")
 
