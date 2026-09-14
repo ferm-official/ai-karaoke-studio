@@ -157,7 +157,22 @@ document.addEventListener("DOMContentLoaded", () => {
     const tabParam = urlParams.get("tab");
     if (tabParam) switchTab(tabParam);
     const projParam = urlParams.get("project");
-    if (projParam) loadExistingProject(projParam);
+    const fsParam = urlParams.get("fs") || urlParams.get("fontSize");
+    const seekParam = urlParams.get("seek") || urlParams.get("t");
+    if (projParam) {
+        loadExistingProject(projParam).then(() => {
+            if (fsParam) applyMasterFontSize(parseInt(fsParam));
+            if (seekParam) {
+                const t = parseFloat(seekParam);
+                if (!isNaN(t)) {
+                    beatAudio.currentTime = t;
+                    updateKaraokeStage(t);
+                }
+            }
+        });
+    } else {
+        if (fsParam) applyMasterFontSize(parseInt(fsParam));
+    }
 });
 
 async function fetchSystemInfo() {
@@ -2917,36 +2932,25 @@ function synchronizeLinesAutoFit(kLine1, kLine2) {
     const content2 = kLine2.querySelector(".line-content") || kLine2;
 
     const baseFontSize = (state.fontSizeLine1 || state.fontSizeLine2 || 52);
-
     let uniformFontSize = baseFontSize;
 
-    if (state.isAutoFitEnabled !== false) {
-        const songSafeSize = getSongGlobalSafeFontSize();
-        uniformFontSize = Math.min(baseFontSize, songSafeSize);
-    }
-
-    // Apply 100% uniform font size to BOTH lines across ALL couplets throughout the song
+    // Apply font size to BOTH lines across couplets
     if (content1) content1.style.fontSize = `${uniformFontSize}px`;
     if (content2) content2.style.fontSize = `${uniformFontSize}px`;
 
-    // Secondary safety step-down: if rendered DOM still breaches maxSafeW,
-    // reduce uniformFontSize and update cached song safe size so the entire song remains uniform!
+    // If Auto-Fit is enabled and rendered text still breaches maxSafeW,
+    // safely step-down so it doesn't overflow the screen
     if (state.isAutoFitEnabled !== false) {
         let curW1 = content1 ? (content1.scrollWidth || 0) : 0;
         let curW2 = content2 ? (content2.scrollWidth || 0) : 0;
         let steps = 0;
-        let adjusted = false;
-        while ((curW1 > maxSafeW || curW2 > maxSafeW) && uniformFontSize > 22 && steps < 5) {
+        while ((curW1 > maxSafeW || curW2 > maxSafeW) && uniformFontSize > 22 && steps < 10) {
             uniformFontSize -= 2;
-            if (content1) content1.style.fontSize = `${uniformFontSize}px`;
-            if (content2) content2.style.fontSize = `${uniformFontSize}px`;
+            if (content1 && curW1 > maxSafeW) content1.style.fontSize = `${uniformFontSize}px`;
+            if (content2 && curW2 > maxSafeW) content2.style.fontSize = `${uniformFontSize}px`;
             curW1 = content1 ? (content1.scrollWidth || 0) : 0;
             curW2 = content2 ? (content2.scrollWidth || 0) : 0;
             steps++;
-            adjusted = true;
-        }
-        if (adjusted) {
-            state._cachedSongSafeSize = uniformFontSize;
         }
     }
 
@@ -3588,9 +3592,11 @@ function setupDraggableSubtitle() {
         }
     };
 
-    document.getElementById("masterFontSizeText")?.addEventListener("click", () => {
+    const openMasterFontSizePrompt = () => {
         promptFontSize(state.fontSizeLine1 || 52, (sz) => applyMasterFontSize(sz));
-    });
+    };
+    document.getElementById("masterFontSizeText")?.addEventListener("click", openMasterFontSizePrompt);
+    document.getElementById("masterFontSizeVal")?.addEventListener("click", openMasterFontSizePrompt);
     document.getElementById("stageFontSize1Text")?.addEventListener("click", () => {
         promptFontSize(state.fontSizeLine1 || 52, (sz) => applyLineFontSize(1, sz));
     });
@@ -4036,7 +4042,22 @@ function renderKaraokeLine(container, segment, currentTime) {
         }
 
         const baseFontSize = (state.fontSizeLine1 || state.fontSizeLine2 || 54);
-        const uniformFs = (state.isAutoFitEnabled !== false) ? Math.min(baseFontSize, getSongGlobalSafeFontSize()) : baseFontSize;
+        let uniformFs = baseFontSize;
+        if (state.isAutoFitEnabled !== false && segment) {
+            const stageScreen = document.getElementById("stageScreen");
+            const stageW = stageScreen?.clientWidth || 1200;
+            const maxSafeW = Math.round(stageW * 0.85);
+            const font = (state.fontName || "Tahoma").replace(/['"]/g, "").split(",")[0].trim();
+            const text = (segment.text || "").trim();
+            if (text) {
+                const w = measureKaraokeTextWidth(text, baseFontSize, font);
+                const wordCount = text.split(/\s+/).length;
+                const adjustedW = w + (wordCount * 8) + 36;
+                if (adjustedW > maxSafeW) {
+                    uniformFs = Math.max(22, Math.floor((maxSafeW / adjustedW) * baseFontSize));
+                }
+            }
+        }
         contentEl.style.fontSize = `${uniformFs}px`;
     }
 

@@ -1372,7 +1372,7 @@ body {
 
 .line-placeholder {
     color: rgba(255, 255, 255, 0.4);
-    font-size: 1.6rem;
+    font-size: inherit !important;
     font-weight: 600;
     font-family: inherit !important;
 }
@@ -4934,8 +4934,8 @@ body {
     right: 6%;
 }
 .line-placeholder {
-    font-family: 'Tahoma', sans-serif;
-    font-size: clamp(20px, 3.5vw, 44px);
+    font-family: inherit !important;
+    font-size: inherit !important;
     font-weight: 800;
     color: #ffffff;
     text-shadow: 2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 0 4px 10px rgba(0,0,0,0.8);

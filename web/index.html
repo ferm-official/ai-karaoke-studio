@@ -6,7 +6,7 @@
     <title>AI Karaoke Studio Pro — Local GPU Engine</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Anton&family=Baloo+2:wght@600;700;800&family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&family=Dancing+Script:wght@700&family=Lexend:wght@400;600;700;800&family=Lobster&family=Montserrat:wght@400;500;600;700;800;900&family=Noto+Serif:wght@600;700&family=Nunito:wght@400;600;700;800;900&family=Oswald:wght@600;700&family=Outfit:wght@300;400;500;600;700;800;900&family=Pattaya&family=Playfair+Display:wght@700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Roboto:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css?v=69.0">
+    <link rel="stylesheet" href="/static/style.css?v=70.0">
 </head>
 <body>
     <div class="app-background">
@@ -572,9 +572,16 @@
                             </div>
 
                             <div class="fader-group" style="margin-top: 10px;">
-                                <div class="fader-head"><span class="fader-name">Cỡ Chữ:</span><span class="fader-val" id="masterFontSizeVal">52px</span></div>
-                                <input type="range" class="fader-input" id="masterFontSizeSlider" min="24" max="72" value="52">
-                                <div class="fader-scale-ticks"><span>24px</span><span>48px</span><span>72px</span></div>
+                                <div class="fader-head">
+                                    <span class="fader-name">Cỡ Chữ:</span>
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <button type="button" class="btn-step-seek" id="btnMasterZoomOut" style="padding: 2px 7px; font-size: 0.72rem; line-height: 1; border-radius: 4px;" title="Giảm cỡ chữ">-</button>
+                                        <span class="fader-val" id="masterFontSizeVal" style="cursor: pointer; text-decoration: underline dotted;" title="Bấm để nhập cỡ chữ tùy ý (20 - 120px)">52px</span>
+                                        <button type="button" class="btn-step-seek" id="btnMasterZoomIn" style="padding: 2px 7px; font-size: 0.72rem; line-height: 1; border-radius: 4px;" title="Tăng cỡ chữ">+</button>
+                                    </div>
+                                </div>
+                                <input type="range" class="fader-input" id="masterFontSizeSlider" min="24" max="110" step="1" value="52">
+                                <div class="fader-scale-ticks"><span>24px</span><span>64px</span><span>110px</span></div>
                             </div>
 
                             <div class="fader-group" style="margin-top: 10px;">
@@ -898,7 +905,7 @@
         </div>
     </div>
 
-    <script src="/static/app.js?v=69.0"></script>
+    <script src="/static/app.js?v=70.0"></script>
 </body>
 </html>
 
