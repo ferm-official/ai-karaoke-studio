@@ -168,79 +168,19 @@ def main():
     ]
     check_run = subprocess.run(verify_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     all_ok = "ALL_CORE_LIBS_OK" in (check_run.stdout or "")
-    # 7. Kiem thu thuc te: Thuc su chay Demucs & Whisper tren phan cung
+    # 7. Kiem thu thuc te: Thuc su chay Demucs, Whisper & Video Rendering tren Mac
     run_e2e = (os.environ.get("GITHUB_ACTIONS") == "true") or ("--test-run" in sys.argv)
     if all_ok and run_e2e:
-        print()
-        print("=" * 68)
-        print("   [KIEM THU THUC TE: CHAY DEMUCS & WHISPER TREN PHAN CUNG]")
-        print("=" * 68)
-        e2e_code = """
-import sys, os, subprocess, shutil
-from pathlib import Path
-
-print('[*] Kiem tra phan cung va he dieu hanh:')
-print(f'    Platform: {sys.platform}')
-import torch
-print(f'    PyTorch version: {torch.__version__}')
-has_mps = hasattr(torch.backends, 'mps') and torch.backends.mps.is_available()
-print(f'    Apple Silicon MPS available: {has_mps}')
-
-# 1. Tao file am thanh test 3s
-test_wav = Path('_test_song.wav')
-subprocess.run([
-    'ffmpeg', '-y', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=3',
-    '-c:a', 'pcm_s16le', '-ar', '44100', str(test_wav)
-], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-print('[OK] [1/3] Da tao file am thanh thu nghiem 3 giay.')
-
-# 2. Chay tach beat thuc te bang Demucs
-from backend.separator import separate_audio
-print('[*] [2/3] Dang chay tach beat Demucs thuc te tren may...')
-stems = separate_audio(
-    input_audio_path=str(test_wav),
-    output_dir='_test_stems_out',
-    model_name='htdemucs',
-    device='cpu',
-    use_cache=False,
-    async_mp3=False
-)
-assert Path(stems['vocals_wav']).exists(), 'Vocals wav not found'
-assert Path(stems['instrumental_wav']).exists(), 'Instrumental wav not found'
-print('[OK] [2/3] Demucs da tach nhac va giong hat thanh cong 100% tren may!')
-
-# 3. Chay nhan dien loi Faster-Whisper thuc te
-from backend.transcriber import transcribe_vocals
-print('[*] [3/3] Dang chay nhan dien loi Whisper thuc te tren may...')
-res = transcribe_vocals(
-    vocal_audio_path=stems['vocals_wav'],
-    model_size='tiny',
-    device='cpu',
-    use_cache=False
-)
-print('[OK] [3/3] Whisper da nhan dien am thanh thanh cong 100% tren may!')
-
-# Don dep file tam
-try:
-    test_wav.unlink(missing_ok=True)
-    shutil.rmtree('_test_stems_out', ignore_errors=True)
-except Exception:
-    pass
-
-print()
-print('=' * 68)
-print('   XAC NHAN: TOAN BO HE THONG AI DA CHAY THUC TE 100% THANH CONG!')
-print('=' * 68)
-"""
-        test_script = base_dir / "_run_e2e_check.py"
-        test_script.write_text(e2e_code, encoding="utf-8")
-        try:
-            subprocess.run([str(python_venv), str(test_script)], check=True)
-        except Exception as e:
-            print(f"[CANH BAO] Kiem thu thuc te gap loi: {e}")
-        finally:
-            if test_script.exists():
-                test_script.unlink()
+        demo_script = base_dir / "docs" / "run_full_mac_demo.py"
+        if demo_script.exists():
+            print()
+            print("=" * 68)
+            print("   [KIEM THU THUC TE: CHAY DEMUCS & WHISPER TREN PHAN CUNG MAC]")
+            print("=" * 68)
+            try:
+                subprocess.run([str(python_venv), str(demo_script)], check=True)
+            except Exception as e:
+                print(f"[CANH BAO] Kiem thu thuc te gap loi: {e}")
 
     print()
     print("=" * 68)
