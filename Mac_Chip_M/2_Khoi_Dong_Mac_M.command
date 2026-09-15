@@ -10,7 +10,7 @@ else
 fi
 
 # 2. Nap day du duong dan he thong macOS va Homebrew Apple Silicon
-export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin:$PATH"
+export PATH="$DIR/../bin:$DIR/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin:$PATH"
 
 echo "======================================================================="
 echo "   AI KARAOKE STUDIO PRO - PHONG THU MAC CHIP M (APPLE SILICON)"

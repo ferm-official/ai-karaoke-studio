@@ -24,8 +24,9 @@ def _encode_stems_mp3_parallel(
 ):
     """Encodes vocals and instrumental WAVs to MP3 in parallel to avoid CPU bottleneck."""
     def _enc(in_wav, out_mp3, bitrate):
+        from backend.video_renderer import get_ffmpeg_bin
         cmd = [
-            "ffmpeg", "-y",
+            get_ffmpeg_bin(), "-y",
             "-i", str(in_wav),
             "-vn",
             "-b:a", bitrate,

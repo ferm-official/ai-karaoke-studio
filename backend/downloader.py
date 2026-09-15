@@ -110,9 +110,11 @@ def download_audio_from_url(url: str, output_dir: str, progress_callback = None)
         if progress_callback and idx > 0:
             progress_callback(6, f"Đang kết nối lại bằng luồng dự phòng {strat['name']}...")
 
+        from backend.video_renderer import get_ffmpeg_bin
         ydl_opts = {
             'format': strat['format'],
             'outtmpl': str(out_dir / '%(title)s.%(ext)s'),
+            'ffmpeg_location': get_ffmpeg_bin(),
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',

@@ -72,8 +72,9 @@ def main():
     t_w_start = time.time()
     tx_data = transcribe_vocals(
         vocal_audio_path=stems["vocals_wav"],
-        model_size="tiny",
+        model_size="base",
         language="vi",
+        custom_prompt="Trời đã ngớt mưa, em giờ đã thấy nhẹ lòng chưa? Sau bao nhiêu nỗi buồn về chuyện đôi lứa",
         device="cpu",
         use_cache=False
     )

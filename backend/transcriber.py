@@ -66,8 +66,9 @@ def prepare_16k_mono_audio(audio_path: Path) -> Path:
     if target_16k.exists() and target_16k.stat().st_size > 1000:
         return target_16k
 
+    from backend.video_renderer import get_ffmpeg_bin
     cmd = [
-        "ffmpeg", "-y",
+        get_ffmpeg_bin(), "-y",
         "-i", str(audio_path),
         "-ar", "16000",
         "-ac", "1",
