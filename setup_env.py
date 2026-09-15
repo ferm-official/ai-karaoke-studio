@@ -125,21 +125,32 @@ def main():
 
     if ffmpeg_ok:
         print("[OK] FFmpeg đã có sẵn trên hệ thống.")
+        if is_macos:
+            try:
+                chk = subprocess.run(["ffmpeg", "-filters"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                if " ass " not in (chk.stdout or ""):
+                    print("[*] Homebrew FFmpeg thiếu bộ lọc 'ass' (libass). Đang cấu hình FFmpeg tĩnh Apple Silicon...")
+                    from backend.video_renderer import ensure_mac_ffmpeg_with_libass
+                    ensure_mac_ffmpeg_with_libass()
+            except Exception as e:
+                pass
     else:
         if is_macos:
-            print("[!] Chưa có FFmpeg trên máy Mac. Đang thử cài đặt tự động qua Homebrew...")
+            print("[!] Đang cài đặt FFmpeg cho máy Mac Apple Silicon...")
             try:
-                b = subprocess.run(["brew", "install", "ffmpeg"], timeout=300)
-                ffmpeg_ok = (b.returncode == 0)
+                from backend.video_renderer import ensure_mac_ffmpeg_with_libass
+                bin_m = ensure_mac_ffmpeg_with_libass()
+                if bin_m:
+                    ffmpeg_ok = True
+                    print(f"[OK] Đã cài đặt FFmpeg tĩnh (hỗ trợ đầy đủ libass KTV) tại {bin_m}")
             except Exception:
-                ffmpeg_ok = False
-            if ffmpeg_ok:
-                print("[OK] Đã cài đặt FFmpeg thành công qua Homebrew.")
-            else:
-                print("-----------------------------------------------------------------------")
-                print("[CHÚ Ý] Máy tính Mac chưa có công cụ FFmpeg.")
-                print("        Vui lòng mở Terminal trên Mac và gõ lệnh:  brew install ffmpeg")
-                print("-----------------------------------------------------------------------")
+                pass
+            if not ffmpeg_ok:
+                try:
+                    b = subprocess.run(["brew", "install", "ffmpeg"], timeout=300)
+                    ffmpeg_ok = (b.returncode == 0)
+                except Exception:
+                    ffmpeg_ok = False
         elif is_windows:
             print("[!] Chưa có FFmpeg trên máy. Đang thử cài đặt tự động qua winget...")
             try:

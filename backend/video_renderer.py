@@ -18,6 +18,57 @@ def escape_ffmpeg_filter_path(path_str: str) -> str:
     p = p.replace("'", "'\\''")
     return p
 
+def ensure_mac_ffmpeg_with_libass() -> Optional[str]:
+    """
+    On macOS, default Homebrew FFmpeg may lack libass.
+    This downloads a verified static FFmpeg ARM64 binary with libass enabled.
+    """
+    base_dir = Path(__file__).resolve().parent.parent
+    bin_dir = base_dir / "bin"
+    ffmpeg_local = bin_dir / "ffmpeg"
+    if ffmpeg_local.exists() and os.access(ffmpeg_local, os.X_OK):
+        return str(ffmpeg_local)
+
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    zip_path = bin_dir / "ffmpeg_mac.zip"
+    try:
+        import urllib.request, zipfile
+        logger.info("Downloading static FFmpeg ARM64 with libass for macOS...")
+        url = "https://ffmpeg.martin-riedl.de/redirect/latest/macos/arm64/release/ffmpeg.zip"
+        req = urllib.request.Request(url, headers={"User-Agent": "curl/8.0.0"})
+        with urllib.request.urlopen(req, timeout=60) as resp, open(zip_path, "wb") as f_out:
+            f_out.write(resp.read())
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            zf.extractall(bin_dir)
+        if ffmpeg_local.exists():
+            os.chmod(ffmpeg_local, 0o755)
+            subprocess.run(["xattr", "-dr", "com.apple.quarantine", str(ffmpeg_local)], check=False)
+            logger.info(f"Installed FFmpeg with libass at: {ffmpeg_local}")
+            return str(ffmpeg_local)
+    except Exception as e:
+        logger.warning(f"Could not auto-download static FFmpeg for Mac: {e}")
+    return None
+
+def get_ffmpeg_bin() -> str:
+    """Returns the best available FFmpeg binary path."""
+    base_dir = Path(__file__).resolve().parent.parent
+    local_bin = base_dir / "bin" / "ffmpeg"
+    if local_bin.exists() and os.access(local_bin, os.X_OK):
+        return str(local_bin)
+
+    if sys.platform == "darwin":
+        try:
+            chk = subprocess.run(["ffmpeg", "-filters"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=3)
+            if " ass " in (chk.stdout or ""):
+                return "ffmpeg"
+        except Exception:
+            pass
+        mac_bin = ensure_mac_ffmpeg_with_libass()
+        if mac_bin:
+            return mac_bin
+
+    return "ffmpeg"
+
 def create_default_background(output_image_path: str, width: int = 1920, height: int = 1080) -> str:
     """
     Creates a stylish dark studio background image with ambient glow if none is provided.
@@ -28,9 +79,11 @@ def create_default_background(output_image_path: str, width: int = 1920, height:
     if out_path.exists():
         return str(out_path)
 
+    ffmpeg_bin = get_ffmpeg_bin()
+
     # Use FFmpeg lavfi to generate a premium dark purple/blue gradient image
     cmd = [
-        "ffmpeg", "-y",
+        ffmpeg_bin, "-y",
         "-f", "lavfi",
         "-i", f"color=c=0x0a0c16:s={width}x{height}",
         "-vf", (
@@ -46,7 +99,7 @@ def create_default_background(output_image_path: str, width: int = 1920, height:
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
     except Exception:
         fallback_cmd = [
-            "ffmpeg", "-y",
+            ffmpeg_bin, "-y",
             "-f", "lavfi",
             "-i", f"color=c=0x0f1123:s={width}x{height}",
             "-frames:v", "1",
@@ -102,16 +155,36 @@ def render_karaoke_video(
     is_video_bg = bg_file.suffix.lower() in [".mp4", ".mov", ".avi", ".mkv", ".webm"]
 
     width, height = resolution.split("x")
+    ffmpeg_bin = get_ffmpeg_bin()
 
+    # Check if this FFmpeg build has the 'ass' filter
+    has_ass = False
+    try:
+        chk = subprocess.run([ffmpeg_bin, "-filters"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=3)
+        has_ass = " ass " in (chk.stdout or "")
+    except Exception:
+        has_ass = False
+
+    sub_extra_args = []
     # Video filter chain
     if is_video_bg:
         # Loop video background to match audio duration
         input_args = ["-stream_loop", "-1", "-i", str(bg_file), "-i", str(audio_file)]
-        vf = f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},ass=filename='{escaped_ass}'"
+        if has_ass:
+            vf = f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},ass=filename='{escaped_ass}'"
+        else:
+            input_args.extend(["-i", str(ass_file)])
+            vf = f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height}"
+            sub_extra_args = ["-c:s", "mov_text"]
     else:
         # Loop static image with subtle zoom/ambient motion
         input_args = ["-loop", "1", "-i", str(bg_file), "-i", str(audio_file)]
-        vf = f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},ass=filename='{escaped_ass}'"
+        if has_ass:
+            vf = f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},ass=filename='{escaped_ass}'"
+        else:
+            input_args.extend(["-i", str(ass_file)])
+            vf = f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height}"
+            sub_extra_args = ["-c:s", "mov_text"]
 
     # Select best hardware accelerated encoder
     is_macos = (sys.platform == "darwin")
@@ -122,7 +195,7 @@ def render_karaoke_video(
     if sys.platform == "win32" and not is_cuda:
         try:
             test_qsv = subprocess.run(
-                ["ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=64x64:d=0.1", "-c:v", "h264_qsv", "-f", "null", "-"],
+                [ffmpeg_bin, "-f", "lavfi", "-i", "color=c=black:s=64x64:d=0.1", "-c:v", "h264_qsv", "-f", "null", "-"],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 timeout=2
@@ -158,7 +231,7 @@ def render_karaoke_video(
         # Check if rubberband is supported in this FFmpeg build
         has_rubberband = False
         try:
-            chk = subprocess.run(["ffmpeg", "-filters"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=2)
+            chk = subprocess.run([ffmpeg_bin, "-filters"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=2)
             has_rubberband = "rubberband" in (chk.stdout or "")
         except Exception:
             has_rubberband = False
@@ -170,7 +243,7 @@ def render_karaoke_video(
         af_cpu_args = ["-af", f"asetrate=44100*{pitch_ratio:.6f},atempo={1.0/pitch_ratio:.6f}"]
 
     cmd = [
-        "ffmpeg", "-y",
+        ffmpeg_bin, "-y",
         *input_args,
         "-vf", vf,
         "-c:v", video_encoder,
@@ -178,6 +251,7 @@ def render_karaoke_video(
         *af_args,
         "-c:a", "aac",
         "-b:a", "320k",
+        *sub_extra_args,
         "-pix_fmt", "yuv420p",
         "-r", str(fps),
         "-shortest",
@@ -196,7 +270,7 @@ def render_karaoke_video(
         logger.warning(f"Primary video render with {gpu_label} failed ({res.stderr[:200]}). Falling back to safe CPU libx264...")
         cpu_tune = ["-tune", "stillimage"] if not is_video_bg else []
         cmd_cpu = [
-            "ffmpeg", "-y",
+            ffmpeg_bin, "-y",
             *input_args,
             "-vf", vf,
             "-c:v", "libx264",
@@ -207,6 +281,7 @@ def render_karaoke_video(
             *af_cpu_args,
             "-c:a", "aac",
             "-b:a", "320k",
+            *sub_extra_args,
             "-pix_fmt", "yuv420p",
             "-r", str(fps),
             "-shortest",
