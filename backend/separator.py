@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 import subprocess
 import shutil
 import logging
@@ -79,6 +80,17 @@ def separate_audio(
     if not input_path.exists():
         raise FileNotFoundError(f"Input audio file not found: {input_audio_path}")
 
+    # Sanitize input filename for Demucs to prevent Windows NTFS illegal folder errors (e.g. trailing space in stem)
+    clean_stem = re.sub(r'[\\/*?:"<>|]', '', input_path.stem).strip()
+    temp_clean_input = None
+    if not clean_stem or clean_stem != input_path.stem:
+        temp_clean_input = out_dir / f"track_clean{input_path.suffix}"
+        if not temp_clean_input.exists() or temp_clean_input.stat().st_size == 0:
+            shutil.copy2(input_path, temp_clean_input)
+        demucs_input_path = temp_clean_input
+    else:
+        demucs_input_path = input_path
+
     file_hash = compute_file_hash(str(input_path))
 
     # Check Cache
@@ -137,7 +149,7 @@ def separate_audio(
         "-d", device,
         "-j", num_jobs,
         "-o", str(out_dir / "_raw_stems"),
-        str(input_path)
+        str(demucs_input_path)
     ]
     if device == "cpu":
         # Ultra-lightweight CPU separation for low-RAM machines (e.g. 4GB RAM):
@@ -209,7 +221,7 @@ def separate_audio(
             )
         raise RuntimeError(f"Demucs separation failed with exit code {process.returncode}:\n{err_detail}")
 
-    track_stem_dir = out_dir / "_raw_stems" / model_name / input_path.stem
+    track_stem_dir = out_dir / "_raw_stems" / model_name / demucs_input_path.stem
     if not track_stem_dir.exists():
         subdirs = list((out_dir / "_raw_stems" / model_name).glob("*"))
         if subdirs:
@@ -242,6 +254,8 @@ def separate_audio(
 
     try:
         shutil.rmtree(out_dir / "_raw_stems", ignore_errors=True)
+        if temp_clean_input and temp_clean_input.exists():
+            temp_clean_input.unlink(missing_ok=True)
     except Exception:
         pass
 
