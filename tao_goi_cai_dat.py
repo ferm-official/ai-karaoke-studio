@@ -15,10 +15,20 @@ from pathlib import Path
 def make_zip_with_unix_permissions(source_dir: Path, output_zip_path: Path, is_mac: bool = False):
     print(f"[*] Dang nen file ZIP: {output_zip_path.name}...")
     with zipfile.ZipFile(output_zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        for file_path in source_dir.rglob("*"):
-            if file_path.is_dir():
-                continue
+        for file_path in sorted(source_dir.rglob("*")):
             arcname = file_path.relative_to(source_dir.parent).as_posix()
+            if file_path.is_dir():
+                if is_mac:
+                    zinfo = zipfile.ZipInfo(arcname + "/")
+                    zinfo.create_system = 3
+                    zinfo.external_attr = (0o755 << 16) | 0o040000
+                    try:
+                        mtime = file_path.stat().st_mtime
+                        zinfo.date_time = time.localtime(mtime)[:6]
+                    except Exception:
+                        zinfo.date_time = (2026, 1, 1, 0, 0, 0)
+                    zf.writestr(zinfo, b"")
+                continue
             zinfo = zipfile.ZipInfo(arcname)
             
             try:

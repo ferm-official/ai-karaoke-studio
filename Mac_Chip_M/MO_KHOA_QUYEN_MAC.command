@@ -17,6 +17,9 @@ echo ""
 
 echo "[*] Dang cap quyen thuc thi cho cac tap lenh Mac..."
 chmod +x "$DIR"/*.command 2>/dev/null
+chmod +x "$ROOT_DIR"/AI_Karaoke_Studio.app/Contents/MacOS/* 2>/dev/null
+find "$ROOT_DIR" -maxdepth 3 -name "*.command" -exec chmod +x {} + 2>/dev/null
+find "$ROOT_DIR" -maxdepth 3 -name "*.sh" -exec chmod +x {} + 2>/dev/null
 
 echo "[*] Dang go bo nhan cach ly quarantine cua macOS..."
 xattr -cr "$ROOT_DIR" 2>/dev/null
