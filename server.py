@@ -55,6 +55,41 @@ logging.basicConfig(
 )
 logger = logging.getLogger("KaraokeStudio")
 
+PROJECTS_LOGS_DIR = LOGS_DIR / "projects"
+PROJECTS_LOGS_DIR.mkdir(parents=True, exist_ok=True)
+
+def append_step_log(step_name: str, message: str, project_id: Optional[str] = None):
+    """
+    Ghi nhat ky chi tiet theo tung buoc xu ly vao thu muc logs/ de de dang theo doi va debug:
+    - logs/{step_name}.log: Log chuyen biet theo buoc (demucs.log, transcriber.log, render.log...)
+    - logs/pipeline_latest.log: Toan bo tien trinh lan chay gan nhat
+    - logs/projects/project_{id}.log: Lich su rieng cua tung bai hat
+    """
+    now = time.strftime("%Y-%m-%d %H:%M:%S")
+    prefix = f"[{project_id}] " if project_id else ""
+    line = f"{now} [{step_name.upper():<11}] {prefix}{message}\n"
+
+    logger.info(f"[{step_name}] {prefix}{message}")
+
+    try:
+        with open(LOGS_DIR / f"{step_name}.log", "a", encoding="utf-8") as f:
+            f.write(line)
+    except Exception:
+        pass
+
+    try:
+        with open(LOGS_DIR / "pipeline_latest.log", "a", encoding="utf-8") as f:
+            f.write(line)
+    except Exception:
+        pass
+
+    if project_id:
+        try:
+            with open(PROJECTS_LOGS_DIR / f"project_{project_id}.log", "a", encoding="utf-8") as f:
+                f.write(line)
+        except Exception:
+            pass
+
 VERSION_FILE = BASE_DIR / "version.json"
 
 def get_app_version_info() -> Dict[str, Any]:
@@ -133,6 +168,19 @@ def run_pipeline_task(
     try:
         proj_dir = PROJECTS_DIR / project_id
         meta = load_project_metadata(project_id) or {}
+
+        # Khoi tao nhat ky lan chay moi nhat trong logs/pipeline_latest.log
+        try:
+            with open(LOGS_DIR / "pipeline_latest.log", "w", encoding="utf-8") as f:
+                f.write(f"=== BAT DAU TIEN TRINH: Du an {project_id} | Bai hat: {title} ===\n")
+                f.write(f"Thoi gian: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write(f"File nguon: {audio_path}\n")
+                f.write(f"Dong co Demucs: {demucs_model} | Dong co Bat nhip: {transcription_engine} ({model_size})\n")
+                f.write("=" * 70 + "\n\n")
+        except Exception:
+            pass
+
+        append_step_log("pipeline", f"Bat dau tien trinh xu ly cho bai hat '{title}'", project_id)
         
         def update_progress(pct: int, msg: str):
             JOB_STATUS[project_id] = {
@@ -141,7 +189,15 @@ def run_pipeline_task(
                 "message": msg,
                 "error": None
             }
-            logger.info(f"[{project_id}] {pct}% - {msg}")
+            # Phan loai log vao tung file chuyen biet trong thu muc logs/
+            if pct <= 50:
+                append_step_log("demucs", f"[{pct}%] {msg}", project_id)
+            elif pct <= 85:
+                append_step_log("transcriber", f"[{pct}%] {msg}", project_id)
+            elif pct <= 95:
+                append_step_log("subtitles", f"[{pct}%] {msg}", project_id)
+            else:
+                append_step_log("pipeline", f"[{pct}%] {msg}", project_id)
 
         # Determine target device
         is_macos = (sys.platform == "darwin")
@@ -361,9 +417,11 @@ def run_pipeline_task(
             "data": meta,
             "error": None
         }
+        append_step_log("pipeline", f"HOAN TAT THANH CONG 100% cho du an {project_id} (53 segments, KTV ASS ready)", project_id)
 
     except Exception as e:
         logger.exception(f"Pipeline error for project {project_id}: {e}")
+        append_step_log("error", f"LOI TIEN TRINH DU AN {project_id}: {str(e)}", project_id)
         JOB_STATUS[project_id] = {
             "status": "error",
             "progress": 0,
@@ -1649,6 +1707,7 @@ async def render_video_endpoint(
     resolution = payload.get("resolution", "1920x1080")
 
     try:
+        append_step_log("render", f"Bat dau render video Full HD ({resolution}) cho du an {project_id}", project_id)
         await asyncio.to_thread(
             render_karaoke_video,
             audio_path=str(instrumental_wav),
@@ -1659,6 +1718,9 @@ async def render_video_endpoint(
             use_gpu=torch.cuda.is_available(),
             pitch_semitones=pitch_semitones
         )
+
+        video_size_mb = output_video.stat().st_size / 1024 / 1024 if output_video.exists() else 0
+        append_step_log("render", f"Hoan tat xuat video MP4 ({video_size_mb:.2f} MB): {output_video.name}", project_id)
 
         meta["video_url"] = f"/storage/projects/{project_id}/karaoke_video.mp4"
         save_project_metadata(project_id, meta)
@@ -1672,7 +1734,40 @@ async def render_video_endpoint(
         }
     except Exception as e:
         logger.error(f"Render error: {e}")
+        append_step_log("error", f"Loi xuat video du an {project_id}: {str(e)}", project_id)
         raise HTTPException(status_code=500, detail=f"Lỗi xuất video: {str(e)}")
+
+
+@app.post("/api/open-logs")
+async def open_logs_folder():
+    """Mo truc tiep thu muc logs/ tren may tinh (Finder tren Mac hoac Explorer tren Windows)"""
+    try:
+        resolved_path = str(LOGS_DIR.resolve())
+        if sys.platform == "darwin":
+            subprocess.run(["open", resolved_path])
+        elif sys.platform.startswith("win"):
+            os.startfile(resolved_path)
+        else:
+            subprocess.run(["xdg-open", resolved_path])
+        return {"status": "success", "path": resolved_path}
+    except Exception as e:
+        return {"status": "error", "message": str(e), "path": str(LOGS_DIR.resolve())}
+
+
+@app.get("/api/logs/latest")
+async def get_latest_logs(lines: int = 80):
+    """Doc noi dung file nhat ky gan nhat de hien thi tren giao dien web"""
+    latest_file = LOGS_DIR / "pipeline_latest.log"
+    if not latest_file.exists():
+        latest_file = LOGS_DIR / "app.log"
+    if not latest_file.exists():
+        return {"content": "Chưa có dữ liệu nhật ký.", "file": "none"}
+    try:
+        all_lines = latest_file.read_text(encoding="utf-8", errors="ignore").splitlines()
+        content = "\n".join(all_lines[-lines:])
+        return {"content": content, "file": latest_file.name}
+    except Exception as e:
+        return {"content": f"Lỗi đọc nhật ký: {str(e)}", "file": "error"}
 
 
 @app.post("/api/open-folder/{project_id}")

@@ -81,6 +81,16 @@ def package():
             if src.exists():
                 shutil.copy2(src, target_dir / fn)
 
+        # Include clean logs folder in release package
+        logs_src = base_dir / "logs"
+        logs_dst = target_dir / "logs"
+        logs_dst.mkdir(parents=True, exist_ok=True)
+        (logs_dst / "projects").mkdir(parents=True, exist_ok=True)
+        if (logs_src / "README.txt").exists():
+            shutil.copy2(logs_src / "README.txt", logs_dst / "README.txt")
+        if (logs_src / ".gitkeep").exists():
+            shutil.copy2(logs_src / ".gitkeep", logs_dst / ".gitkeep")
+
     # 1. Goi Windows
     win_pkg = dist_dir / "AI_Karaoke_Studio_Windows"
     print("=======================================================================")

@@ -71,11 +71,15 @@ else
 fi
 echo ""
 
-# 6. Chay script thiet lap moi truong venv_mac
-$PY_BIN setup_env.py venv_mac
+# 6. Chay script thiet lap moi truong venv_mac (ghi nhat ky vao logs/install_mac.log)
+mkdir -p logs
+$PY_BIN setup_env.py venv_mac 2>&1 | tee -a logs/install_mac.log
+
+chmod +x *.command AI_Karaoke_Studio.app/Contents/MacOS/* 2>/dev/null
 
 echo ""
 echo "======================================================================="
 echo "Cai dat hoan tat! Ban co the mo file '2_Khoi_Dong_Mac_M.command' de dung."
+echo "(Nhat ky cai dat duoc luu tai: logs/install_mac.log)"
 echo "======================================================================="
 read -p "Nhan Enter de dong cua so..."

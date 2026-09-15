@@ -41,6 +41,33 @@ def main():
         print("[CẢNH BÁO] Python 3.13+ có thể chưa tương thích hoàn toàn với một số bản build của PyTorch/Demucs.")
 
     base_dir = Path(__file__).resolve().parent
+    logs_dir = base_dir / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    install_log_file = logs_dir / "install.log"
+
+    try:
+        class TeeLogger:
+            def __init__(self, filepath, stream):
+                self.stream = stream
+                self.logfile = open(filepath, "a", encoding="utf-8")
+            def write(self, message):
+                self.stream.write(message)
+                try:
+                    self.logfile.write(message)
+                    self.logfile.flush()
+                except Exception:
+                    pass
+            def flush(self):
+                self.stream.flush()
+                try:
+                    self.logfile.flush()
+                except Exception:
+                    pass
+
+        sys.stdout = TeeLogger(install_log_file, sys.stdout)
+    except Exception:
+        pass
+
     is_windows = (sys.platform == "win32")
     is_macos = (sys.platform == "darwin")
 
