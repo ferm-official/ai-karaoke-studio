@@ -114,33 +114,33 @@ export function initAppVersionAndUpdateSystem() {
                 btnVersionPill?.classList.add("has-update");
                 if (versionBadgeNotify) versionBadgeNotify.style.display = "inline-block";
                 if (modalUpdateStatus) {
-                    modalUpdateStatus.textContent = `🔔 Có bản cập nhật mới (${data.behind_commits || 1} thay đổi)`;
+                    modalUpdateStatus.textContent = `Có bản cập nhật mới (${data.behind_commits || 1} thay đổi)`;
                     modalUpdateStatus.style.color = "#F59E0B";
                 }
                 if (btnPerformUpdate) {
                     btnPerformUpdate.style.display = "inline-flex";
-                    btnPerformUpdate.innerHTML = `🚀 Cập Nhật Ngay (${data.behind_commits || 1} bản mới)`;
+                    btnPerformUpdate.innerHTML = `Cập Nhật Ngay (${data.behind_commits || 1} bản mới)`;
                 }
 
                 if (data.changelog && data.changelog.length && updateChangelogBox) {
-                    updateChangelogBox.innerHTML = data.changelog.map(c => `<div class="changelog-item">🔹 ${c}</div>`).join("");
+                    updateChangelogBox.innerHTML = data.changelog.map(c => `<div class="changelog-item">• ${c}</div>`).join("");
                 }
 
                 if (!isManual) {
-                    showToastNotification(`🔔 Đã có bản cập nhật mới! (Bản hiện tại: ${curVer}). Bấm phiên bản để cập nhật.`);
+                    showToastNotification(`Đã có bản cập nhật mới! (Bản hiện tại: ${curVer}). Bấm phiên bản để cập nhật.`);
                 }
             } else {
                 btnVersionPill?.classList.remove("has-update");
                 if (versionBadgeNotify) versionBadgeNotify.style.display = "none";
                 if (modalUpdateStatus) {
-                    modalUpdateStatus.textContent = data.is_offline ? `Chế độ độc lập (${curVer})` : `✅ Bạn đang dùng phiên bản mới nhất (${curVer})`;
+                    modalUpdateStatus.textContent = data.is_offline ? `Chế độ độc lập (${curVer})` : `Bạn đang dùng phiên bản mới nhất (${curVer})`;
                     modalUpdateStatus.style.color = "#10B981";
                 }
                 if (btnPerformUpdate) {
-                    btnPerformUpdate.innerHTML = `✅ Hệ Thống Đã Mới Nhất`;
+                    btnPerformUpdate.innerHTML = `Hệ Thống Đã Mới Nhất`;
                 }
                 if (isManual) {
-                    showToastNotification(`✅ Bạn đang sử dụng bản mới nhất (${curVer})!`);
+                    showToastNotification(`Bạn đang sử dụng bản mới nhất (${curVer})!`);
                 }
             }
         } catch (e) {
@@ -156,7 +156,7 @@ export function initAppVersionAndUpdateSystem() {
         if (!confirm("Bạn có chắc chắn muốn tiến hành cập nhật hệ thống ngay bây giờ không?")) return;
 
         btnPerformUpdate.disabled = true;
-        btnPerformUpdate.innerHTML = `<span class="spinner-small" style="margin-right: 6px;">⏳</span> Đang cập nhật...`;
+        btnPerformUpdate.innerHTML = `Đang cập nhật...`;
         if (updateConsoleBox) updateConsoleBox.style.display = "block";
         if (updateConsoleLog) updateConsoleLog.textContent = "[*] Đang kéo bản cập nhật mới nhất từ Git...\n";
 
@@ -167,21 +167,21 @@ export function initAppVersionAndUpdateSystem() {
             if (updateConsoleLog) updateConsoleLog.textContent += (data.output || "") + "\n";
 
             if (data.success) {
-                if (updateConsoleLog) updateConsoleLog.textContent += "\n[✔] CẬP NHẬT THÀNH CÔNG! Đang khởi động lại trang...";
-                showToastNotification("🎉 Đã cập nhật thành công! Đang làm mới hệ thống...");
+                if (updateConsoleLog) updateConsoleLog.textContent += "\n[OK] CẬP NHẬT THÀNH CÔNG! Đang khởi động lại trang...";
+                showToastNotification("Đã cập nhật thành công! Đang làm mới hệ thống...");
                 setTimeout(() => {
                     window.location.reload();
                 }, 2000);
             } else {
                 if (updateConsoleLog) updateConsoleLog.textContent += `\n[x] Lỗi: ${data.message || "Không thể hoàn thành cập nhật"}`;
                 btnPerformUpdate.disabled = false;
-                btnPerformUpdate.innerHTML = `🚀 Thử Cập Nhật Lại`;
-                showToastNotification("❌ Cập nhật gặp lỗi! Xem chi tiết trong cửa sổ thông báo.");
+                btnPerformUpdate.innerHTML = `Thử Cập Nhật Lại`;
+                showToastNotification("Cập nhật gặp lỗi! Xem chi tiết trong cửa sổ thông báo.");
             }
         } catch (err) {
             if (updateConsoleLog) updateConsoleLog.textContent += `\n[x] Lỗi mạng: ${err.message}`;
             btnPerformUpdate.disabled = false;
-            btnPerformUpdate.innerHTML = `🚀 Thử Cập Nhật Lại`;
+            btnPerformUpdate.innerHTML = `Thử Cập Nhật Lại`;
         }
     });
 
@@ -197,7 +197,7 @@ export function initAppVersionAndUpdateSystem() {
 
         if (btnInstallEnvModal) {
             btnInstallEnvModal.disabled = true;
-            btnInstallEnvModal.innerHTML = `⏳ Đang cài thư viện...`;
+            btnInstallEnvModal.innerHTML = `Đang cài thư viện...`;
         }
         if (btnInstallEnvHeader) {
             btnInstallEnvHeader.disabled = true;
@@ -210,7 +210,7 @@ export function initAppVersionAndUpdateSystem() {
             if (updateConsoleLog) {
                 updateConsoleLog.textContent += (data.output || "") + "\n";
                 if (data.success) {
-                    updateConsoleLog.textContent += `\n[✔] ${data.message || "CÀI ĐẶT THƯ VIỆN HOÀN TẤT!"}`;
+                    updateConsoleLog.textContent += `\n[OK] ${data.message || "CÀI ĐẶT THƯ VIỆN HOÀN TẤT!"}`;
                 } else {
                     updateConsoleLog.textContent += `\n[x] Lỗi: ${data.message || "Cài đặt thất bại"}`;
                 }
@@ -224,7 +224,7 @@ export function initAppVersionAndUpdateSystem() {
         } finally {
             if (btnInstallEnvModal) {
                 btnInstallEnvModal.disabled = false;
-                btnInstallEnvModal.innerHTML = `📦 Cài Môi Trường (pip)`;
+                btnInstallEnvModal.innerHTML = `Cài Môi Trường (pip)`;
             }
             if (btnInstallEnvHeader) {
                 btnInstallEnvHeader.disabled = false;

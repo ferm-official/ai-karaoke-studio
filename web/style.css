@@ -3591,66 +3591,127 @@ body {
     pointer-events: none;
 }
 
-/* 2. Lead-in Countdown Dots (● ● ● ● / 4 3 2 1) */
+/* 2. Professional KTV Countdown Cues (Hearts / Smileys / Dots / Numbers) */
 .stage-countdown-wrap {
     position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 25;
+    z-index: 28;
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 10px;
     pointer-events: none;
-    animation: fadeInDown 0.25s ease;
-    transition: top 0.2s ease, opacity 0.2s ease;
+    transition: top 0.12s ease, left 0.12s ease, opacity 0.18s ease;
 }
 
-.countdown-label {
-    font-size: 0.74rem;
-    font-weight: 800;
-    letter-spacing: 2px;
-    color: var(--cyan-accent);
-    background: rgba(10, 18, 36, 0.88);
-    border: 1px solid rgba(0, 242, 254, 0.5);
-    padding: 4px 16px;
-    border-radius: var(--radius-full);
-    text-transform: uppercase;
-    box-shadow: 0 0 16px rgba(0, 242, 254, 0.35);
-    backdrop-filter: blur(8px);
-}
-
-.countdown-dots {
+.countdown-items-row {
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 12px;
 }
 
-.c-dot {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: rgba(15, 23, 42, 0.75);
-    border: 2px solid rgba(255, 255, 255, 0.35);
-    color: rgba(255, 255, 255, 0.75);
-    font-size: 0.78rem;
-    font-weight: 800;
-    font-family: var(--font-mono, monospace);
+.cd-item {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
-    backdrop-filter: blur(8px);
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transform-origin: center bottom;
+    user-select: none;
 }
 
-.c-dot.active {
-    background: var(--gold-accent, #FFE259);
+/* Kiểu 1: Trái Tim Đỏ (3D Red Hearts - Theo Ảnh 1) */
+.cd-item.cd-heart {
+    color: rgba(255, 30, 86, 0.3);
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+    transform: scale(0.9);
+}
+.cd-item.cd-heart svg {
+    filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.6));
+}
+.cd-item.cd-heart.active {
+    color: #ff2a5f;
+    filter: drop-shadow(0 0 14px rgba(255, 42, 95, 0.95)) drop-shadow(0 2px 6px rgba(0, 0, 0, 0.8));
+    transform: scale(1.3);
+    animation: cdBeatPop 0.24s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Kiểu 2: Mặt Cười Vàng (Yellow Smileys - Theo Ảnh 2) */
+.cd-item.cd-smiley {
+    opacity: 0.35;
+    filter: grayscale(0.4) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+    transform: scale(0.9);
+}
+.cd-item.cd-smiley.active {
+    opacity: 1;
+    filter: drop-shadow(0 0 14px rgba(255, 210, 51, 0.95)) drop-shadow(0 2px 6px rgba(0, 0, 0, 0.8));
+    transform: scale(1.3);
+    animation: cdBeatPop 0.24s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Kiểu 3: Chấm Tròn KTV Neon (Neon Glowing Dots) */
+.cd-item.cd-dot {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+    transform: scale(0.9);
+}
+.cd-item.cd-dot.active {
+    background: #ffe259;
     border-color: #ffffff;
-    color: #0b0f19;
+    box-shadow: 0 0 16px #ffe259, 0 0 28px rgba(255, 226, 89, 0.85);
     transform: scale(1.35);
-    box-shadow: 0 0 16px var(--gold-accent, #FFE259), 0 0 28px rgba(255, 226, 89, 0.85);
+    animation: cdBeatPop 0.24s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Kiểu 4: Số Đếm (Numbers 4-3-2-1) */
+.cd-item.cd-number {
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-size: 1.15rem;
+    font-weight: 900;
+    color: rgba(255, 255, 255, 0.35);
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+    transform: scale(0.9);
+}
+.cd-item.cd-number.active {
+    color: #0b0f19;
+    background: #38bdf8;
+    border-color: #ffffff;
+    box-shadow: 0 0 16px #38bdf8, 0 0 24px rgba(56, 189, 248, 0.85);
+    transform: scale(1.3);
+    animation: cdBeatPop 0.24s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes cdBeatPop {
+    0% { transform: scale(0.85); }
+    50% { transform: scale(1.45); }
+    100% { transform: scale(1.3); }
+}
+
+/* Huy Hiệu Tone Ca Sĩ Trên Sân Khấu (Tone Nam / Nữ - Theo Ảnh 2) */
+.stage-tone-badge {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    font-size: 0.95rem;
+    font-weight: 900;
+    color: #ffffff;
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    border: 2px solid #ffffff;
+    padding: 3px 12px;
+    border-radius: 6px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6), 0 0 14px rgba(239, 68, 68, 0.5);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    z-index: 24;
+    pointer-events: none;
+    font-family: 'Be Vietnam Pro', Tahoma, sans-serif;
+    text-shadow: 1.5px 1.5px 0 #000, -1.5px -1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px 1.5px 0 #000;
+    animation: fadeInDown 0.3s ease;
 }
 
 /* 3. Live Karaoke Studio Mic & Echo/Reverb Deck Card */
@@ -4687,7 +4748,7 @@ body {
 /* 1. Bố Cục Toàn Màn Hình 3 Cột (Ultra-Wide Edge-to-Edge) */
 .studio-3col-layout {
     display: grid;
-    grid-template-columns: 245px minmax(0, 1fr) 260px;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     gap: 10px;
     width: 100%;
     min-height: calc(100vh - 100px);
@@ -4702,6 +4763,7 @@ body {
 
 /* 2. Cột Bên (Sidebar Left & Right) */
 .studio-side-col {
+    width: 255px;
     background: #0d1322;
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 10px;
@@ -4711,6 +4773,148 @@ body {
     gap: 8px;
     max-height: calc(100vh - 105px);
     overflow-y: auto;
+    transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), padding 0.2s ease;
+    box-sizing: border-box;
+}
+
+.studio-side-col.collapsed {
+    width: 44px !important;
+    min-width: 44px !important;
+    padding: 10px 4px !important;
+    cursor: pointer;
+    overflow: hidden;
+    background: rgba(13, 19, 34, 0.7);
+}
+.studio-side-col.collapsed .sidebar-inner-content {
+    display: none !important;
+}
+.studio-side-col.collapsed .col-header-main {
+    flex-direction: column;
+    padding-bottom: 0;
+    border-bottom: none;
+    gap: 12px;
+}
+.studio-side-col.collapsed .col-header-title,
+.studio-side-col.collapsed .col-header-tag {
+    display: none !important;
+}
+.studio-side-col.collapsed .collapsed-indicator {
+    display: flex !important;
+}
+
+.collapsed-indicator {
+    display: none;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    transform: rotate(180deg);
+    color: #94a3b8;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    margin-top: 16px;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.btn-sidebar-collapse {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #94a3b8;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.72rem;
+    transition: all 0.15s;
+    margin-left: auto;
+}
+.btn-sidebar-collapse:hover {
+    background: rgba(56, 189, 248, 0.15);
+    border-color: #38bdf8;
+    color: #38bdf8;
+}
+
+.sidebar-inner-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+}
+
+/* Segmented Tabs Navigation Cột Phải */
+.sidebar-tabs-nav {
+    display: flex;
+    background: rgba(0, 0, 0, 0.35);
+    padding: 3px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    gap: 3px;
+    margin-bottom: 2px;
+}
+.sidebar-tab-btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    padding: 6px 3px;
+    border-radius: 6px;
+    font-size: 0.69rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.18s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    font-family: inherit;
+}
+.sidebar-tab-btn:hover {
+    color: #f1f5f9;
+}
+.sidebar-tab-btn.active {
+    background: rgba(56, 189, 248, 0.15);
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.tab-content-panel {
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+}
+.tab-content-panel.active {
+    display: flex;
+}
+
+/* Accordion Vang Echo / Reverb */
+.collapsible-fx-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.72rem;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 6px 2px 2px 2px;
+    margin-top: 4px;
+    font-weight: 600;
+    border-top: 1px dashed rgba(255, 255, 255, 0.08);
+}
+.collapsible-fx-toggle:hover {
+    color: #38bdf8;
+}
+.collapsible-fx-body {
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+    padding-top: 4px;
+}
+.collapsible-fx-body.open {
+    display: flex;
 }
 
 .studio-side-col::-webkit-scrollbar {
@@ -4968,21 +5172,82 @@ body {
     z-index: 1;
 }
 
-/* 2 Dòng Phụ Đề Chuẩn */
+/* 2 Dòng Phụ Đề Chuẩn — Hỗ Trợ Kéo Chuột Trực Tiếp Trên Màn Hình */
 .karaoke-line {
     position: absolute;
-    z-index: 5;
+    z-index: 10;
     white-space: nowrap;
     user-select: none;
+    cursor: grab;
+    border: 1px dashed transparent;
+    border-radius: 8px;
+    padding: 2px 8px;
+    transition: border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
+}
+.karaoke-line:hover {
+    border-color: rgba(56, 189, 248, 0.45);
+    background: rgba(15, 23, 42, 0.45);
+}
+.karaoke-line.dragging {
+    cursor: grabbing !important;
+    border-color: #38bdf8 !important;
+    background: rgba(12, 18, 32, 0.85) !important;
+    box-shadow: 0 0 24px rgba(56, 189, 248, 0.4);
+    z-index: 35 !important;
+    transition: none !important;
 }
 .karaoke-line.line-1 {
     top: 58%;
     left: 6%;
 }
 .karaoke-line.line-2 {
-    top: 74%;
+    top: 76%;
     right: 6%;
 }
+
+/* Floating HUD Badge hiển thị khi rê chuột hoặc kéo */
+.line-drag-badge {
+    position: absolute;
+    top: -24px;
+    left: 4px;
+    background: rgba(12, 18, 32, 0.92);
+    border: 1px solid rgba(56, 189, 248, 0.45);
+    color: #94a3b8;
+    font-family: 'JetBrains Mono', monospace, sans-serif;
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(3px);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    z-index: 40;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+.karaoke-line.line-2 .line-drag-badge {
+    left: auto;
+    right: 4px;
+}
+.karaoke-line:hover .line-drag-badge,
+.karaoke-line.dragging .line-drag-badge {
+    opacity: 1;
+    transform: translateY(0);
+}
+.line-drag-badge .badge-title {
+    color: #38bdf8;
+    letter-spacing: 0.05em;
+}
+.line-drag-badge .badge-sep {
+    color: rgba(255, 255, 255, 0.3);
+}
+.line-drag-badge .badge-pos {
+    color: #ffffff;
+}
+
 .line-placeholder {
     font-family: inherit !important;
     font-size: inherit !important;

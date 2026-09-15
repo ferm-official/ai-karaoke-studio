@@ -1,0 +1,17 @@
+#!/bin/bash
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+APP_ROOT="$DIR/../../.."
+export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin:$PATH"
+cd "$APP_ROOT"
+
+if [ ! -f "venv_mac/bin/python" ]; then
+    INSTALL_CMD="1_CAI_DAT_MAC_M.command"
+    if [ -f "Mac_Chip_M/1_Cai_Dat_Mac_M.command" ]; then
+        INSTALL_CMD="Mac_Chip_M/1_Cai_Dat_Mac_M.command"
+    fi
+    osascript -e "tell application \"Terminal\" to do script \"cd '$APP_ROOT' && bash '$INSTALL_CMD'\""
+    exit 0
+fi
+
+(sleep 1 && open "http://127.0.0.1:8008") &
+./venv_mac/bin/python server.py

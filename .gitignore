@@ -6,6 +6,7 @@ __pycache__/
 .Python
 env/
 venv/
+venv_mac/
 ENV/
 env.bak/
 venv.bak/
@@ -18,6 +19,7 @@ storage/cache/*
 test_file/*
 !test_file/.gitkeep
 test/
+dist_packages/
 
 # Audio & Video media files
 *.wav

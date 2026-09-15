@@ -50,11 +50,9 @@ def _encode_stems_mp3_parallel(
 
 
 def get_best_device() -> str:
-    """Returns 'cuda' if NVIDIA GPU is available, 'mps' if Apple Silicon GPU is available, else 'cpu'."""
+    """Returns 'cuda' if NVIDIA GPU is available, else 'cpu'. On macOS, Demucs runs on high-speed CPU ARM NEON to avoid MPS STFT crashes."""
     if torch.cuda.is_available():
         return "cuda"
-    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-        return "mps"
     return "cpu"
 
 
@@ -195,6 +193,19 @@ def separate_audio(
     process.wait()
     if process.returncode != 0:
         err_detail = "\n".join(output_lines[-10:])
+        if device == "mps":
+            logger.warning(f"Demucs MPS error ({err_detail}). Auto-falling back to Apple Silicon CPU...")
+            if progress_callback:
+                progress_callback(15, "Chuyển sang chế độ CPU ARM NEON tối ưu cho Apple Silicon...")
+            return separate_audio(
+                input_audio_path=input_audio_path,
+                output_dir=output_dir,
+                model_name=model_name,
+                device="cpu",
+                use_cache=use_cache,
+                progress_callback=progress_callback,
+                async_mp3=async_mp3
+            )
         raise RuntimeError(f"Demucs separation failed with exit code {process.returncode}:\n{err_detail}")
 
     track_stem_dir = out_dir / "_raw_stems" / model_name / input_path.stem

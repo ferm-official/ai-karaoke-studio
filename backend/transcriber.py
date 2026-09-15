@@ -162,7 +162,7 @@ def transcribe_vocals(
         initial_prompt=initial_prompt,
         beam_size=beam_size,
         temperature=0.0,
-        condition_on_previous_text=True
+        condition_on_previous_text=False
     )
 
     detected_lang = info.language
@@ -248,7 +248,8 @@ def transcribe_vocals(
             language=lang_param,
             vad_filter=False,
             beam_size=(1 if device == "cpu" else 5),
-            temperature=0.0
+            temperature=0.0,
+            condition_on_previous_text=False
         )
         for segment in retry_generator:
             seg_text = segment.text.strip()

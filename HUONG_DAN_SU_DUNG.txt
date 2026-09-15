@@ -2,20 +2,45 @@
                AI KARAOKE STUDIO PRO - HUONG DAN SU DUNG
 =======================================================================
 
-1. CAI DAT MOI TRUONG (CHI CHAY 1 LAN DAU TIEN TREN MAY MOI)
-   - Nhap dup chuot vao file:  1_CAI_DAT_MOI_TRUONG.bat
-   - He thong se tu dong tao moi truong ao (venv) va cai dat toan bo thu vien AI.
-   - Luu y: May can co san Python 3.10 hoac 3.11 tai tu https://www.python.org/downloads/
-     (Khi cai dat Python, nho TICH CHON vao o "Add Python to PATH").
+Phan mem ho tro day du 3 he thong voi cac thu muc rieng biet:
 
-2. KHOI DONG PHONG THU
-   - Nhap dup chuot vao file:  2_KHOI_DONG_TOOL.bat
-   - Trinh duyet web se tu dong mo dia chi: http://127.0.0.1:8008
+1. THU MUC: Windows/ (Danh cho may tinh Windows 10, 11)
+-----------------------------------------------------------------------
+- Cai dat moi truong:
+  Mo folder "Windows" va nhap dup vao:  1_Cai_Dat_Windows.bat
+  He thong tu dong tao venv, tai thu vien AI va kich hoat NVIDIA CUDA.
+- Khoi dong phong thu:
+  Mo folder "Windows" va nhap dup vao:  2_Khoi_Dong_Windows.bat
+  Trinh duyet se tu dong mo dia chi: http://127.0.0.1:8008
 
-3. CAC BUOC TAO VIDEO KARAOKE
-   - Buoc 1: Dan duong link YouTube hoac chon file bai hat (MP3, WAV...) tu may tinh.
-   - Buoc 2: Nhan "Bat dau tao Karaoke" va de AI tu dong tach beat Demucs va nhan dien loi Whisper.
-   - Buoc 3: Vao tab "Phong Thu" de nghe thu ca si / beat, sua loi tung tu hoac keo thanh truot vi tri chu (Dong 1, Dong 2).
-   - Buoc 4: Vao tab "Xuat File" de tai file phu de ASS (cho Aegisub, Premiere) hoac Render xuat video MP4 Karaoke Full HD.
 
+2. THU MUC: Mac_Chip_M/ (Danh cho Mac Apple Silicon M1, M2, M3, M4)
+-----------------------------------------------------------------------
+- Cai dat moi truong:
+  Mo folder "Mac_Chip_M" va nhap dup vao:  1_Cai_Dat_Mac_M.command
+  He thong tu dong thiet lap tang toc GPU Metal (MPS) va Apple VideoToolbox.
+- Khoi dong phong thu:
+  Mo folder "Mac_Chip_M" va nhap dup vao:  2_Khoi_Dong_Mac_M.command
+  Trinh duyet se tu dong mo: http://127.0.0.1:8008
+- Neu macOS thong bao chua co quyen chay file:
+  Mo Terminal go lenh: chmod +x Mac_Chip_M/*.command
+
+
+3. THU MUC: MacOS_Intel/ (Danh cho Mac dung CPU Intel Core i5/i7/i9)
+-----------------------------------------------------------------------
+- Cai dat moi truong:
+  Mo folder "MacOS_Intel" va nhap dup vao:  1_Cai_Dat_MacOS_Intel.command
+- Khoi dong phong thu:
+  Mo folder "MacOS_Intel" va nhap dup vao:  2_Khoi_Dong_MacOS_Intel.command
+- Neu macOS thong bao chua co quyen chay file:
+  Mo Terminal go lenh: chmod +x MacOS_Intel/*.command
+
+
+4. QUY TRINH TAO VIDEO KARAOKE:
+-----------------------------------------------------------------------
+- Buoc 1: Dan link YouTube hoac tai len file am thanh (MP3, WAV, FLAC, M4A).
+- Buoc 2: Nhan "Bat dau tao Karaoke" de AI tach beat va nhan dien loi.
+- Buoc 3: Vao tab "Phong Thu" de tinh chinh loi, keo chuot truc tiep tren man hinh
+          de chinh vi tri Dong 1 / Dong 2, chon kieu dem nhip (Trai Tim / Mat Cuoi).
+- Buoc 4: Nhan "Xuat Video MP4 Full HD" hoac tai file phu de ASS / LRC.
 =======================================================================

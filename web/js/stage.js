@@ -523,6 +523,24 @@ export function renderCountdownDots(currentTime, segments) {
     const wrap = document.getElementById("stageCountdownWrap");
     if (!wrap) return;
 
+    // Render tone badge if enabled
+    const toneBadge = document.getElementById("stageToneBadge");
+    if (toneBadge) {
+        if (state.showToneBadge) {
+            const pitch = state.currentPitchSemitones || 0;
+            let toneText = "Tone Gốc";
+            if (pitch < 0) {
+                toneText = pitch === -1 ? "Tone Nam" : `Tone Nam (${pitch})`;
+            } else if (pitch > 0) {
+                toneText = pitch === 1 ? "Tone Nữ" : `Tone Nữ (+${pitch})`;
+            }
+            toneBadge.textContent = toneText;
+            toneBadge.style.display = "block";
+        } else {
+            toneBadge.style.display = "none";
+        }
+    }
+
     if (state.showCountdownDots === false) {
         wrap.style.display = "none";
         return;
@@ -545,32 +563,73 @@ export function renderCountdownDots(currentTime, segments) {
 
     const timeLeft = nextUpcoming.start - currentTime;
     const gapDuration = nextUpcoming.start - prevEnd;
+    const count = state.countdownCount === 3 ? 3 : 4;
+    const totalLeadTime = count === 3 ? 1.8 : 2.4;
 
-    if ((prevEnd <= 1.0 || gapDuration >= 3.5) && timeLeft > 0.05 && timeLeft <= 2.0) {
+    if ((prevEnd <= 1.0 || gapDuration >= 2.8) && timeLeft > 0.05 && timeLeft <= totalLeadTime) {
         const kLine1 = document.getElementById("kLine1");
-        if (kLine1 && kLine1.offsetTop > 60) {
-            wrap.style.top = `${Math.max(32, kLine1.offsetTop - 56)}px`;
-            wrap.style.transform = "translateX(-50%)";
-        } else {
-            wrap.style.top = "50%";
-            wrap.style.transform = "translate(-50%, -50%)";
+        const stage = document.getElementById("stageScreen");
+        const stageW = stage ? stage.clientWidth : 800;
+
+        // Position countdown directly above Line 1
+        if (kLine1) {
+            wrap.style.top = `${Math.max(16, kLine1.offsetTop - 38)}px`;
+            
+            // Align horizontally with Line 1
+            const isCenter = state.line1Align === "center" || state.layoutPreset === "center" || kLine1.classList.contains("align-center");
+            if (isCenter) {
+                wrap.style.left = "50%";
+                wrap.style.transform = "translateX(-50%)";
+                wrap.style.justifyContent = "center";
+            } else {
+                const line1Left = kLine1.offsetLeft || (stageW * 0.08);
+                wrap.style.left = `${line1Left}px`;
+                wrap.style.transform = "none";
+                wrap.style.justifyContent = "flex-start";
+            }
         }
 
         wrap.style.display = "flex";
-        const dots = wrap.querySelectorAll(".c-dot");
-        const label = document.getElementById("stageCountdownLabel");
-        if (label) {
-            label.textContent = timeLeft <= 0.5 ? "HÁT!" : "VÀO NHỊP";
+
+        // Rebuild items if count or style changed
+        const style = state.countdownStyle || "hearts";
+        const container = document.getElementById("stageCountdownDots") || wrap;
+        if (container.dataset.renderedStyle !== style || container.dataset.renderedCount !== String(count)) {
+            container.dataset.renderedStyle = style;
+            container.dataset.renderedCount = String(count);
+            container.innerHTML = "";
+
+            for (let i = 0; i < count; i++) {
+                const item = document.createElement("span");
+                item.dataset.index = i;
+
+                if (style === "hearts") {
+                    item.className = "cd-item cd-heart";
+                    item.innerHTML = `<svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
+                } else if (style === "smileys") {
+                    item.className = "cd-item cd-smiley";
+                    item.innerHTML = `<svg viewBox="0 0 32 32" width="28" height="28"><circle cx="16" cy="16" r="14" fill="#FFD233" stroke="#1e293b" stroke-width="1.8"/><path d="M9 13 Q11 10 13 13" stroke="#1e293b" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M19 13 Q21 10 23 13" stroke="#1e293b" stroke-width="2" fill="none" stroke-linecap="round"/><ellipse cx="8.5" cy="17" rx="2" ry="1.2" fill="#ff7675" opacity="0.85"/><ellipse cx="23.5" cy="17" rx="2" ry="1.2" fill="#ff7675" opacity="0.85"/><path d="M11 18 Q16 23 21 18" stroke="#1e293b" stroke-width="2" fill="none" stroke-linecap="round"/></svg>`;
+                } else if (style === "dots") {
+                    item.className = "cd-item cd-dot";
+                } else {
+                    item.className = "cd-item cd-number";
+                    item.textContent = String(count - i);
+                }
+                container.appendChild(item);
+            }
         }
-        if (dots.length >= 4) {
-            dots[0].classList.toggle("active", timeLeft <= 2.0);
-            dots[1].classList.toggle("active", timeLeft <= 1.5);
-            dots[2].classList.toggle("active", timeLeft <= 1.0);
-            dots[3].classList.toggle("active", timeLeft <= 0.5);
+
+        // Sequential beat lighting
+        const items = container.querySelectorAll(".cd-item");
+        for (let i = 0; i < count; i++) {
+            const threshold = totalLeadTime * ((count - i) / count);
+            const isActive = timeLeft <= threshold;
+            items[i]?.classList.toggle("active", isActive);
         }
     } else {
         wrap.style.display = "none";
-        wrap.querySelectorAll(".c-dot").forEach(d => d.classList.remove("active"));
+        const items = wrap.querySelectorAll(".cd-item");
+        items.forEach(it => it.classList.remove("active"));
     }
 }
 

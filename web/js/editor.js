@@ -817,7 +817,7 @@ export function setupEditor() {
         }
         if (geminiAlignStatusMsg) {
             geminiAlignStatusMsg.style.display = "block";
-            geminiAlignStatusMsg.innerHTML = "🧠 Đang tải file vocal và phân tích nhịp bằng Gemini AI... Vui lòng đợi trong giây lát!";
+            geminiAlignStatusMsg.innerHTML = "Đang tải file vocal và phân tích nhịp bằng Gemini AI... Vui lòng đợi trong giây lát!";
         }
 
         const formData = new FormData();
@@ -844,7 +844,7 @@ export function setupEditor() {
         } catch (err) {
             if (geminiAlignStatusMsg) {
                 geminiAlignStatusMsg.style.display = "block";
-                geminiAlignStatusMsg.innerHTML = `⚠️ Lỗi: ${err.message}`;
+                geminiAlignStatusMsg.innerHTML = `Lỗi: ${err.message}`;
             }
             alert(`Lỗi: ${err.message}`);
         } finally {

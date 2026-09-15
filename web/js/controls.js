@@ -313,12 +313,58 @@ export function initStudioInspector() {
         });
     });
 
-    // Lead-in Countdown Dots Toggle
+    // Lead-in Countdown Dots & Styles Setup
     const chkCountdown = document.getElementById("chkCountdownDots");
     chkCountdown?.addEventListener("change", (e) => {
         state.showCountdownDots = e.target.checked;
         saveProjectStageSettings();
-        showToastNotification(state.showCountdownDots ? "Đã bật chấm đếm nhịp vào câu" : "Đã tắt chấm đếm nhịp vào câu");
+        showToastNotification(state.showCountdownDots ? "Đã bật biểu tượng đếm nhịp vào câu" : "Đã tắt biểu tượng đếm nhịp vào câu");
+    });
+
+    // Countdown Style Buttons (Hearts / Smileys / Dots / Numbers)
+    document.querySelectorAll("#cdStyleGroup .btn-layout-pill").forEach(btn => {
+        btn.addEventListener("click", () => {
+            document.querySelectorAll("#cdStyleGroup .btn-layout-pill").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            state.countdownStyle = btn.dataset.style || "hearts";
+            const container = document.getElementById("stageCountdownDots");
+            if (container) container.dataset.renderedStyle = "";
+            saveProjectStageSettings();
+            const names = { hearts: "Trái Tim Đỏ (Ảnh 1)", smileys: "Mặt Cười Vàng (Ảnh 2)", dots: "Chấm KTV", numbers: "Số 4-3-2-1" };
+            showToastNotification(`Đã chọn kiểu đếm nhịp: ${names[state.countdownStyle] || state.countdownStyle}`);
+        });
+    });
+
+    // Countdown Beat Count (4 vs 3 beats)
+    const btnCdBeats4 = document.getElementById("btnCdBeats4");
+    const btnCdBeats3 = document.getElementById("btnCdBeats3");
+    btnCdBeats4?.addEventListener("click", () => {
+        btnCdBeats4.classList.add("active");
+        btnCdBeats3?.classList.remove("active");
+        state.countdownCount = 4;
+        const container = document.getElementById("stageCountdownDots");
+        if (container) container.dataset.renderedCount = "";
+        saveProjectStageSettings();
+        showToastNotification("Đã chọn đếm 4 nhịp (4-3-2-1)");
+    });
+    btnCdBeats3?.addEventListener("click", () => {
+        btnCdBeats3.classList.add("active");
+        btnCdBeats4?.classList.remove("active");
+        state.countdownCount = 3;
+        const container = document.getElementById("stageCountdownDots");
+        if (container) container.dataset.renderedCount = "";
+        saveProjectStageSettings();
+        showToastNotification("Đã chọn đếm 3 nhịp (3-2-1)");
+    });
+
+    // Stage Tone Badge Toggle
+    const chkShowToneBadge = document.getElementById("chkShowToneBadge");
+    chkShowToneBadge?.addEventListener("change", (e) => {
+        state.showToneBadge = e.target.checked;
+        const toneBadge = document.getElementById("stageToneBadge");
+        if (toneBadge) toneBadge.style.display = state.showToneBadge ? "block" : "none";
+        saveProjectStageSettings();
+        showToastNotification(state.showToneBadge ? "Đã bật nhãn Tone trên sân khấu" : "Đã tắt nhãn Tone");
     });
 
     applyWipingFxMode();
@@ -416,7 +462,23 @@ export function applyLinePositionY(lineNum, posYFraction) {
     if (textEl) textEl.textContent = `${pctY}%`;
     if (sliderEl) sliderEl.value = pctY;
 
-    // Show preview placeholder if line is currently empty so user immediately sees slider movement
+    // Update Sidebar Position Chips
+    const badgePos = document.getElementById(lineNum === 1 ? "badgePos1" : "badgePos2");
+    if (badgePos) badgePos.textContent = `D${lineNum}: ${pctY}%`;
+
+    // Update On-Screen Floating Badges
+    const onStageBadgePos = document.getElementById(lineNum === 1 ? "kLine1BadgePos" : "kLine2BadgePos");
+    if (onStageBadgePos) onStageBadgePos.textContent = `${pctY}%`;
+
+    // Re-align countdown dots if Line 1 moves
+    if (lineNum === 1) {
+        const wrap = document.getElementById("stageCountdownWrap");
+        if (wrap && wrap.style.display !== "none") {
+            wrap.style.top = `${Math.max(32, lineEl.offsetTop - 56)}px`;
+        }
+    }
+
+    // Show preview placeholder if line is currently empty so user immediately sees position change
     const contentEl = lineEl.querySelector(".line-content") || lineEl;
     if (contentEl && (!contentEl.textContent || !contentEl.textContent.trim())) {
         contentEl.innerHTML = `<span class="line-placeholder">${lineNum === 1 ? "AI Karaoke Studio Pro" : "Nhấn Phát để bắt đầu hát"}</span>`;
@@ -731,6 +793,9 @@ export async function saveProjectStageSettings() {
         pitch_semitones: state.currentPitchSemitones || 0,
         wiping_fx: state.wipingFxMode || "smooth",
         show_countdown: state.showCountdownDots !== false,
+        countdown_style: state.countdownStyle || "hearts",
+        countdown_count: state.countdownCount || 4,
+        show_tone_badge: state.showToneBadge === true,
         display_mode: state.stageDisplayMode || "pingpong"
     };
 
@@ -793,156 +858,113 @@ export function setupDraggableSubtitle() {
             }, { passive: true });
         }
 
-        // 3. Move / Dragging Line Block
+        // 3. Move / Dragging Line Block (Kéo Thả Vị Trí Bằng Chuột Trực Tiếp Trên Sân Khấu)
         lineEl.addEventListener("mousedown", (e) => {
             if (e.target.closest(".line-resize-handle") || e.target.closest(".hud-btn-zoom") || e.target.closest(".hud-btn-edit") || e.target.closest(".stage-inline-edit-wrap")) return;
+            if (e.button !== 0) return; // Chỉ nhận chuột trái
+            e.preventDefault();
+            e.stopPropagation();
+
             isDragging = true;
-            startX = e.clientX;
             startY = e.clientY;
-            initialTopPx = lineEl.offsetTop;
-            initialLeftPx = lineEl.offsetLeft;
             lineEl.classList.add("dragging");
             stageScreen.classList.add("dragging-active");
+            document.body.style.cursor = "grabbing";
+            document.body.style.userSelect = "none";
 
-            if (lineEl.classList.contains("align-center") || lineEl.classList.contains("align-right")) {
-                lineEl.classList.remove("align-center", "align-right");
-                delete lineEl.dataset.align;
-                lineEl.style.left = `${initialLeftPx}px`;
-                lineEl.style.right = "auto";
-                lineEl.style.transform = "none";
-                document.querySelectorAll(".btn-preset-chip, .btn-dock-pill").forEach(b => b.classList.remove("active"));
-            }
-            e.preventDefault();
+            const handleWindowMouseMove = (moveEvent) => {
+                if (!isDragging) return;
+                const stageRect = stageScreen.getBoundingClientRect();
+                if (stageRect.height <= 0) return;
+
+                const deltaY = moveEvent.clientY - startY;
+                const deltaFrac = deltaY / stageRect.height;
+                const baseFrac = (lineNum === 1 
+                    ? (state.line1PosY !== undefined ? state.line1PosY : 0.58) 
+                    : (state.line2PosY !== undefined ? state.line2PosY : 0.76));
+
+                let newFrac = baseFrac + deltaFrac;
+                if (lineNum === 1) {
+                    newFrac = Math.max(0.18, Math.min(0.82, newFrac));
+                } else {
+                    newFrac = Math.max(0.25, Math.min(0.92, newFrac));
+                }
+
+                startY = moveEvent.clientY; // Cập nhật mốc liên tục để kéo mượt
+                applyLinePositionY(lineNum, newFrac);
+            };
+
+            const handleWindowMouseUp = () => {
+                window.removeEventListener("mousemove", handleWindowMouseMove);
+                window.removeEventListener("mouseup", handleWindowMouseUp);
+                if (isDragging) {
+                    isDragging = false;
+                    lineEl.classList.remove("dragging");
+                    stageScreen.classList.remove("dragging-active");
+                    document.body.style.cursor = "";
+                    document.body.style.userSelect = "";
+                    if (typeof state.saveSettingsToLocalStorage === "function") {
+                        state.saveSettingsToLocalStorage();
+                    }
+                }
+            };
+
+            window.addEventListener("mousemove", handleWindowMouseMove);
+            window.addEventListener("mouseup", handleWindowMouseUp);
         });
 
         lineEl.addEventListener("touchstart", (e) => {
             if (e.target.closest(".line-resize-handle") || e.target.closest(".hud-btn-zoom") || e.target.closest(".hud-btn-edit") || e.target.closest(".stage-inline-edit-wrap")) return;
             if (e.touches.length === 1) {
                 isDragging = true;
-                startX = e.touches[0].clientX;
                 startY = e.touches[0].clientY;
-                initialTopPx = lineEl.offsetTop;
-                initialLeftPx = lineEl.offsetLeft;
                 lineEl.classList.add("dragging");
                 stageScreen.classList.add("dragging-active");
-
-                if (lineEl.classList.contains("align-center") || lineEl.classList.contains("align-right")) {
-                    lineEl.classList.remove("align-center", "align-right");
-                    delete lineEl.dataset.align;
-                    lineEl.style.left = `${initialLeftPx}px`;
-                    lineEl.style.right = "auto";
-                    lineEl.style.transform = "none";
-                    document.querySelectorAll(".btn-preset-chip, .btn-dock-pill").forEach(b => b.classList.remove("active"));
-                }
             }
         }, { passive: true });
+
+        lineEl.addEventListener("touchmove", (e) => {
+            if (!isDragging || e.touches.length !== 1) return;
+            const stageRect = stageScreen.getBoundingClientRect();
+            if (stageRect.height <= 0) return;
+
+            e.preventDefault();
+            const deltaY = e.touches[0].clientY - startY;
+            const deltaFrac = deltaY / stageRect.height;
+            const baseFrac = (lineNum === 1 
+                ? (state.line1PosY !== undefined ? state.line1PosY : 0.58) 
+                : (state.line2PosY !== undefined ? state.line2PosY : 0.76));
+
+            let newFrac = baseFrac + deltaFrac;
+            if (lineNum === 1) {
+                newFrac = Math.max(0.18, Math.min(0.82, newFrac));
+            } else {
+                newFrac = Math.max(0.25, Math.min(0.92, newFrac));
+            }
+
+            startY = e.touches[0].clientY;
+            applyLinePositionY(lineNum, newFrac);
+        }, { passive: false });
+
+        const handleTouchEnd = () => {
+            if (isDragging) {
+                isDragging = false;
+                lineEl.classList.remove("dragging");
+                stageScreen.classList.remove("dragging-active");
+                if (typeof state.saveSettingsToLocalStorage === "function") {
+                    state.saveSettingsToLocalStorage();
+                }
+            }
+        };
+
+        lineEl.addEventListener("touchend", handleTouchEnd, { passive: true });
+        lineEl.addEventListener("touchcancel", handleTouchEnd, { passive: true });
 
         // Double-click on stage line to directly edit text
         lineEl.addEventListener("dblclick", (e) => {
             if (e.target.closest(".line-resize-handle") || e.target.closest(".hud-btn-zoom") || e.target.closest(".stage-inline-edit-wrap")) return;
             e.stopPropagation();
             startStageInlineEdit(lineNum);
-        });
-
-        // 4. Global Movement Listeners
-        window.addEventListener("mousemove", (e) => {
-            if (isResizing) {
-                const delta = ((e.clientX - startX) + (e.clientY - startY)) * 0.35;
-                const stageW = stageScreen.clientWidth || 800;
-                const maxSafe = calculateCoupletMaxSafeSize(kLine1, kLine2, stageW);
-                const rawTarget = Math.round(initialSize + delta);
-                const isClamped = rawTarget > maxSafe;
-                const newSize = Math.max(24, Math.min(maxSafe, rawTarget));
-
-                lineEl.classList.toggle("clamped-boundary", isClamped);
-                applyLineFontSize(lineNum, newSize);
-
-                if (isClamped) {
-                    const hud = document.getElementById(lineNum === 1 ? "kLine1HudSize" : "kLine2HudSize");
-                    if (hud) hud.textContent = `${newSize}px (Đạt giới hạn viền)`;
-                }
-                return;
-            }
-
-            if (!isDragging) return;
-            const deltaX = e.clientX - startX;
-            const deltaY = e.clientY - startY;
-            const stageW = stageScreen.clientWidth || 800;
-            const stageH = stageScreen.clientHeight || 480;
-            const lineW = lineEl.clientWidth || 200;
-            const lineH = lineEl.clientHeight || 50;
-            const safeMargin = Math.round(stageW * 0.06);
-
-            const maxLeft = Math.max(safeMargin, stageW - lineW - safeMargin);
-            const maxTop = stageH - lineH - 10;
-
-            const newLeft = Math.max(safeMargin, Math.min(maxLeft, initialLeftPx + deltaX));
-            const newTop = Math.max(10, Math.min(maxTop, initialTopPx + deltaY));
-
-            applyLinePositionX(lineNum, newLeft / stageW);
-            applyLinePositionY(lineNum, newTop / stageH);
-        });
-
-        window.addEventListener("touchmove", (e) => {
-            if (isResizing && e.touches.length === 1) {
-                const delta = ((e.touches[0].clientX - startX) + (e.touches[0].clientY - startY)) * 0.35;
-                const stageW = stageScreen.clientWidth || 800;
-                const maxSafe = calculateCoupletMaxSafeSize(kLine1, kLine2, stageW);
-                const rawTarget = Math.round(initialSize + delta);
-                const isClamped = rawTarget > maxSafe;
-                const newSize = Math.max(24, Math.min(maxSafe, rawTarget));
-
-                lineEl.classList.toggle("clamped-boundary", isClamped);
-                applyLineFontSize(lineNum, newSize);
-
-                if (isClamped) {
-                    const hud = document.getElementById(lineNum === 1 ? "kLine1HudSize" : "kLine2HudSize");
-                    if (hud) hud.textContent = `${newSize}px (Đạt giới hạn viền)`;
-                }
-                return;
-            }
-
-            if (!isDragging || e.touches.length !== 1) return;
-            const deltaX = e.touches[0].clientX - startX;
-            const deltaY = e.touches[0].clientY - startY;
-            const stageW = stageScreen.clientWidth || 800;
-            const stageH = stageScreen.clientHeight || 480;
-            const lineW = lineEl.clientWidth || 200;
-            const lineH = lineEl.clientHeight || 50;
-            const safeMargin = Math.round(stageW * 0.06);
-
-            const maxLeft = Math.max(safeMargin, stageW - lineW - safeMargin);
-            const maxTop = stageH - lineH - 10;
-
-            const newLeft = Math.max(safeMargin, Math.min(maxLeft, initialLeftPx + deltaX));
-            const newTop = Math.max(10, Math.min(maxTop, initialTopPx + deltaY));
-
-            applyLinePositionX(lineNum, newLeft / stageW);
-            applyLinePositionY(lineNum, newTop / stageH);
-        }, { passive: true });
-
-        window.addEventListener("mouseup", () => {
-            if (isDragging) {
-                isDragging = false;
-                lineEl.classList.remove("dragging");
-                stageScreen.classList.remove("dragging-active");
-            }
-            if (isResizing) {
-                isResizing = false;
-                lineEl.classList.remove("resizing", "clamped-boundary");
-            }
-        });
-
-        window.addEventListener("touchend", () => {
-            if (isDragging) {
-                isDragging = false;
-                lineEl.classList.remove("dragging");
-                stageScreen.classList.remove("dragging-active");
-            }
-            if (isResizing) {
-                isResizing = false;
-                lineEl.classList.remove("resizing", "clamped-boundary");
-            }
         });
     }
 
@@ -1363,6 +1385,19 @@ export function loadProjectData(projectData) {
     const chkCountdown = document.getElementById("chkCountdownDots");
     if (chkCountdown) chkCountdown.checked = state.showCountdownDots;
 
+    state.countdownStyle = saved.countdown_style || "hearts";
+    document.querySelectorAll("#cdStyleGroup .btn-layout-pill").forEach(b => {
+        b.classList.toggle("active", b.dataset.style === state.countdownStyle);
+    });
+
+    state.countdownCount = parseInt(saved.countdown_count) || 4;
+    document.getElementById("btnCdBeats4")?.classList.toggle("active", state.countdownCount === 4);
+    document.getElementById("btnCdBeats3")?.classList.toggle("active", state.countdownCount === 3);
+
+    state.showToneBadge = !!saved.show_tone_badge;
+    const chkTone = document.getElementById("chkShowToneBadge");
+    if (chkTone) chkTone.checked = state.showToneBadge;
+
     state.stageDisplayMode = saved.display_mode || saved.stage_display_mode || "pingpong";
     document.querySelectorAll(".display-mode-btn").forEach(b => {
         b.classList.toggle("active", b.dataset.mode === state.stageDisplayMode);
@@ -1400,10 +1435,76 @@ export function loadProjectData(projectData) {
     updateKaraokeStage(0);
 }
 
+export function initCleanSidebarControls() {
+    // 1. Right Sidebar Segmented Tabs
+    const tabBtns = document.querySelectorAll(".sidebar-tab-btn");
+    tabBtns.forEach(btn => {
+        btn.addEventListener("click", () => {
+            tabBtns.forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            const target = btn.dataset.tab;
+            document.querySelectorAll(".tab-content-panel").forEach(p => p.classList.remove("active"));
+            if (target) {
+                document.getElementById(target)?.classList.add("active");
+            }
+        });
+    });
+
+    // 2. Sidebar Collapse / Expand Toggles
+    const sidebarLeft = document.getElementById("sidebarLeft");
+    const sidebarRight = document.getElementById("sidebarRight");
+    const btnToggleLeft = document.getElementById("btnToggleLeft");
+    const btnToggleRight = document.getElementById("btnToggleRight");
+
+    btnToggleLeft?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        sidebarLeft?.classList.toggle("collapsed");
+        if (btnToggleLeft) {
+            btnToggleLeft.textContent = sidebarLeft?.classList.contains("collapsed") ? "▶" : "◀";
+        }
+    });
+
+    sidebarLeft?.addEventListener("click", () => {
+        if (sidebarLeft.classList.contains("collapsed")) {
+            sidebarLeft.classList.remove("collapsed");
+            if (btnToggleLeft) btnToggleLeft.textContent = "◀";
+        }
+    });
+
+    btnToggleRight?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        sidebarRight?.classList.toggle("collapsed");
+        if (btnToggleRight) {
+            btnToggleRight.textContent = sidebarRight?.classList.contains("collapsed") ? "◀" : "▶";
+        }
+    });
+
+    sidebarRight?.addEventListener("click", () => {
+        if (sidebarRight.classList.contains("collapsed")) {
+            sidebarRight.classList.remove("collapsed");
+            if (btnToggleRight) btnToggleRight.textContent = "▶";
+        }
+    });
+
+    // 3. Collapsible FX Accordion
+    const btnToggleFx = document.getElementById("btnToggleFx");
+    const fxBody = document.getElementById("fxBody");
+    const fxArrow = document.getElementById("fxArrow");
+
+    btnToggleFx?.addEventListener("click", () => {
+        fxBody?.classList.toggle("open");
+        if (fxArrow) {
+            fxArrow.textContent = fxBody?.classList.contains("open") ? "▴" : "▾";
+        }
+    });
+}
+
 export function setupControls() {
     initStudioInspector();
     initTimingSyncPopover();
     initMasterQuickActions();
     setupDraggableSubtitle();
+    initCleanSidebarControls();
 }
+
 

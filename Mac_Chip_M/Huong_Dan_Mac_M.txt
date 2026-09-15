@@ -1,0 +1,34 @@
+=======================================================================
+   AI KARAOKE STUDIO PRO - HUONG DAN SU DUNG CHO MAC CHIP M (APPLE SILICON)
+   (Ap dung cho tat ca MacBook Air, Pro, Mac mini, iMac, Mac Studio chip M1/M2/M3/M4)
+=======================================================================
+
+1. XU LY QUYEN TRUOC KHI CHAY (Neu moi tai file ZIP ve tu Internet/Drive/Zalo):
+   - Khi tai file tu Internet ve, tinh nang Gatekeeper cua macOS co the chan file .command.
+   - Ban chi can lam 1 trong 2 cach sau (chi can lam 1 lan dau tien):
+     + Cach 1 (Nhanh nhat): Mo ung dung Terminal tren Mac (Cmd + Space, go Terminal).
+       Keo file "MO_KHOA_QUYEN_MAC.command" tha vao cua so Terminal roi an Enter.
+     + Cach 2: Mo Terminal, go lenh:
+       chmod +x Mac_Chip_M/*.command && xattr -cr .
+
+
+2. CAI DAT MOI TRUONG (Chi chay 1 lan dau tien):
+   - Nhap dup vao file:  1_Cai_Dat_Mac_M.command
+   - He thong tu dong tao moi truong ao "venv_mac" rieng biet va tai thu vien AI.
+   - May Mac can co san Python 3 (khuyen nghi 3.10 hoac 3.11). Neu may chua co,
+     script se tu dong mo trang tai ban cai dat chuan cho macOS.
+   - Mac chip M se tu dong su dung bo ma hoa video phan cung Apple VideoToolbox
+     (Apple Media Engine) giup xuat video Full HD cuc nhanh ma may van mat me.
+
+
+3. KHOI DONG PHONG THU:
+   - Nhap dup vao file:  2_Khoi_Dong_Mac_M.command
+   - Trinh duyet Safari / Chrome se tu dong mo dia chi: http://127.0.0.1:8008
+   - Phong thu AI san sang hoat dong 100% offline tren may cua ban!
+
+
+4. TOI UU KHI TACH BEAT & NHAN DIEN LOI (DEMUCS & WHISPER):
+   - Demucs chay toi uu hoa tren da luong CPU ARM NEON va bo nho hop nhat
+     (Unified Memory) cua chip Apple Silicon, dam bao on dinh 100% khong bi loi.
+   - Whisper nhan dien loi tieng Viet cuc nhanh voi thu vien Apple Accelerate (~3 giay).
+=======================================================================

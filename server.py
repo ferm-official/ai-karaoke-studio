@@ -144,11 +144,15 @@ def run_pipeline_task(
             logger.info(f"[{project_id}] {pct}% - {msg}")
 
         # Determine target device
-        is_gpu = (device_mode == "gpu") and torch.cuda.is_available()
-        demucs_device = "cuda" if is_gpu else "cpu"
-        whisper_device = "cuda" if is_gpu else "cpu"
-        whisper_compute = "float16" if is_gpu else "int8"
-        hw_label = "GPU CUDA" if is_gpu else "CPU Đa Luồng"
+        is_macos = (sys.platform == "darwin")
+        has_mps = hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
+        is_cuda = torch.cuda.is_available()
+        is_gpu = (device_mode == "gpu") and is_cuda
+
+        demucs_device = "cuda" if (is_gpu and is_cuda) else "cpu"
+        whisper_device = "cuda" if (is_gpu and is_cuda) else "cpu"
+        whisper_compute = "float16" if (is_gpu and is_cuda) else "int8"
+        hw_label = "GPU CUDA" if is_cuda else ("Apple Silicon (ARM NEON + VideoToolbox)" if is_macos else "CPU Đa Luồng")
 
         update_progress(5, f"Đang kiểm tra Cache & khởi tạo AI ({hw_label})...")
 
@@ -1125,7 +1129,10 @@ async def import_subtitles_endpoint(
         font_size_line1=settings.get("font_size_line1"),
         font_size_line2=settings.get("font_size_line2"),
         align_line1=settings.get("align_line1", "left"),
-        align_line2=settings.get("align_line2", "right")
+        align_line2=settings.get("align_line2", "right"),
+        countdown_style=settings.get("countdown_style", "hearts"),
+        countdown_count=int(settings.get("countdown_count", 4)),
+        show_countdown=settings.get("show_countdown", True)
     )
     generate_lrc(segments, str(lrc_path))
     generate_json_lyrics(segments, str(json_path))
@@ -1550,7 +1557,10 @@ async def save_project_settings(
             align_line1=settings.get("align_line1", "left"),
             align_line2=settings.get("align_line2", "right"),
             layout_preset=settings.get("layout_preset", "center"),
-            display_mode=settings.get("display_mode", "pingpong")
+            display_mode=settings.get("display_mode", "pingpong"),
+            countdown_style=settings.get("countdown_style", "hearts"),
+            countdown_count=int(settings.get("countdown_count", 4)),
+            show_countdown=settings.get("show_countdown", True)
         )
 
     save_project_metadata(project_id, meta)

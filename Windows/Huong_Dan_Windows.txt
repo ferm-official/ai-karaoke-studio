@@ -1,0 +1,20 @@
+=======================================================================
+   AI KARAOKE STUDIO PRO - HUONG DAN SU DUNG DANG WINDOWS
+=======================================================================
+
+1. CAI DAT MOI TRUONG (Chi chay 1 lan dau tien khi moi tai ve):
+   - Nhap dup vao file:  1_Cai_Dat_Windows.bat
+   - He thong se tu dong kiem tra Python, tao moi truong ao venv va cai
+     dat day du cac thu vien AI (Demucs, Whisper, PyTorch GPU CUDA...).
+   - Neu may chua co Python, he thong se tu dong mo trang tai ve.
+     Luu y quan trong khi cai Python: Tich chon vao muc "Add Python to PATH".
+
+2. KHOI DONG PHONG THU:
+   - Nhap dup vao file:  2_Khoi_Dong_Windows.bat
+   - Cua so dong lenh se khoi chay AI Server cuc bo va tu dong mo
+     trinh duyet web tai dia chi: http://127.0.0.1:8008
+
+3. LUU Y PHAN CUNG:
+   - Tool tu dong nhan dien card roi NVIDIA va kich hoat tang toc CUDA.
+   - Neu may khong co card roi NVIDIA, he thong se tu dong chay che do CPU.
+=======================================================================

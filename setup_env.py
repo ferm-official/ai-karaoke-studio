@@ -17,6 +17,14 @@ if sys.platform == "win32":
         sys.stderr.reconfigure(encoding="utf-8")
     except Exception:
         pass
+elif sys.platform == "darwin":
+    # Ensure Homebrew and standard macOS bin directories are in PATH
+    extra_paths = ["/opt/homebrew/bin", "/opt/homebrew/sbin", "/usr/local/bin", "/usr/local/sbin"]
+    current_path = os.environ.get("PATH", "")
+    for p in extra_paths:
+        if p not in current_path and os.path.exists(p):
+            current_path = f"{p}:{current_path}"
+    os.environ["PATH"] = current_path
 
 def main():
     print("=" * 68)
@@ -33,9 +41,18 @@ def main():
         print("[CẢNH BÁO] Python 3.13+ có thể chưa tương thích hoàn toàn với một số bản build của PyTorch/Demucs.")
 
     base_dir = Path(__file__).resolve().parent
-    venv_dir = base_dir / "venv"
     is_windows = (sys.platform == "win32")
     is_macos = (sys.platform == "darwin")
+
+    # Isolate virtual environments between Windows and Mac
+    venv_name = "venv" if is_windows else "venv_mac"
+    for arg in sys.argv[1:]:
+        if not arg.startswith("-"):
+            venv_name = arg
+            break
+
+    venv_dir = base_dir / venv_name
+    print(f"[*] Thư mục môi trường ảo mục tiêu: {venv_name}")
 
     if is_windows:
         python_venv = venv_dir / "Scripts" / "python.exe"
@@ -109,23 +126,38 @@ def main():
     if ffmpeg_ok:
         print("[OK] FFmpeg đã có sẵn trên hệ thống.")
     else:
-        print("[!] Chưa có FFmpeg trên máy. Đang thử cài đặt tự động qua winget...")
-        try:
-            w = subprocess.run(["winget", "install", "Gyan.FFmpeg", "--accept-package-agreements", "--accept-source-agreements"], timeout=180)
-            ffmpeg_ok = (w.returncode == 0)
-        except Exception:
-            ffmpeg_ok = False
+        if is_macos:
+            print("[!] Chưa có FFmpeg trên máy Mac. Đang thử cài đặt tự động qua Homebrew...")
+            try:
+                b = subprocess.run(["brew", "install", "ffmpeg"], timeout=300)
+                ffmpeg_ok = (b.returncode == 0)
+            except Exception:
+                ffmpeg_ok = False
+            if ffmpeg_ok:
+                print("[OK] Đã cài đặt FFmpeg thành công qua Homebrew.")
+            else:
+                print("-----------------------------------------------------------------------")
+                print("[CHÚ Ý] Máy tính Mac chưa có công cụ FFmpeg.")
+                print("        Vui lòng mở Terminal trên Mac và gõ lệnh:  brew install ffmpeg")
+                print("-----------------------------------------------------------------------")
+        elif is_windows:
+            print("[!] Chưa có FFmpeg trên máy. Đang thử cài đặt tự động qua winget...")
+            try:
+                w = subprocess.run(["winget", "install", "Gyan.FFmpeg", "--accept-package-agreements", "--accept-source-agreements"], timeout=180)
+                ffmpeg_ok = (w.returncode == 0)
+            except Exception:
+                ffmpeg_ok = False
 
-        if ffmpeg_ok:
-            print("[OK] Đã cài đặt FFmpeg thành công qua winget.")
-        else:
-            print("-----------------------------------------------------------------------")
-            print("[CHÚ Ý] Máy tính chưa có công cụ FFmpeg trong biến môi trường PATH.")
-            print("        Tool cần FFmpeg để xuất video Karaoke MP4 và tách âm thanh.")
-            print("        Cách cài nhanh trên Windows (mở PowerShell và gõ):")
-            print("            winget install Gyan.FFmpeg")
-            print("        Hoặc tải giải nén từ: https://www.gyan.dev/ffmpeg/builds/")
-            print("-----------------------------------------------------------------------")
+            if ffmpeg_ok:
+                print("[OK] Đã cài đặt FFmpeg thành công qua winget.")
+            else:
+                print("-----------------------------------------------------------------------")
+                print("[CHÚ Ý] Máy tính chưa có công cụ FFmpeg trong biến môi trường PATH.")
+                print("        Tool cần FFmpeg để xuất video Karaoke MP4 và tách âm thanh.")
+                print("        Cách cài nhanh trên Windows (mở PowerShell và gõ):")
+                print("            winget install Gyan.FFmpeg")
+                print("        Hoặc tải giải nén từ: https://www.gyan.dev/ffmpeg/builds/")
+                print("-----------------------------------------------------------------------")
 
     # 6. Verify core libraries installation
     print()
@@ -148,14 +180,14 @@ def main():
     print()
     print("=" * 68)
     if all_ok:
-        print("   🎉 CHÚC MỪNG! ĐÃ CÀI ĐẶT MÔI TRƯỜNG VENV HOÀN TẤT (100%)")
+        print("   [HOAN TAT] DA CAI DAT MOI TRUONG VENV HOAN TAT (100%)")
     else:
-        print("   ⚠️ HOÀN TẤT THIẾT LẬP VỚI MỘT SỐ CẢNH BÁO MẠNG")
+        print("   [CANH BAO] HOAN TAT THIET LAP VOI MOT SO CANH BAO MANG")
     print("=" * 68)
     if is_windows:
-        print("👉 Khởi động phòng thu bằng cách chạy file:  2_KHOI_DONG_TOOL.bat")
+        print("[*] Khoi dong phong thu bang cach chay file trong thu muc Windows: 2_Khoi_Dong_Windows.bat")
     else:
-        print("👉 Khởi động phòng thu bằng lệnh:  ./venv/bin/python server.py")
+        print(f"[*] Khoi dong phong thu bang cach chay file: ./{venv_name}/bin/python server.py")
     print("=" * 68)
 
 if __name__ == "__main__":

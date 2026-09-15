@@ -1,10 +1,15 @@
 @echo off
 setlocal
-title AI Karaoke Studio Pro - Cai Dat Moi Truong (1-Click Installer)
+if exist "%~dp0\setup_env.py" (
+    cd /d "%~dp0"
+) else (
+    cd /d "%~dp0\.."
+)
+title AI Karaoke Studio Pro - Cai Dat Windows (1-Click Installer)
 color 0A
 
 echo =======================================================================
-echo          AI KARAOKE STUDIO PRO - CAI DAT MOI TRUONG TU DONG
+echo          AI KARAOKE STUDIO PRO - CAI DAT WINDOWS TU DONG
 echo =======================================================================
 echo.
 
@@ -67,7 +72,7 @@ echo   1. Mo file "python-3.10.11-amd64.exe" vua tai ve trong muc Downloads.
 echo   2. O ngay man hinh dau tien, hay TICH CHON vao o:
 echo          [x] Add Python 3.10 to PATH
 echo   3. Nhap chuot vao "Install Now" de bat dau cai dat.
-echo   4. Sau khi cai dat xong, hay mo lai file [1_CAI_DAT_MOI_TRUONG.bat] nay!
+echo   4. Sau khi cai dat xong, hay mo lai file [1_Cai_Dat_Windows.bat] nay!
 echo -----------------------------------------------------------------------
 echo.
 pause

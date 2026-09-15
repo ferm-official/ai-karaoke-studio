@@ -1,47 +1,50 @@
-﻿# 🎤 AI Karaoke Studio Pro
+# AI Karaoke Studio Pro
 
-Phần mềm chuyên nghiệp tự động tách nhạc nền (Demucs v4) và nhận diện lời bài hát (Faster-Whisper) chạy 100% Offline / Local trên máy tính cá nhân. Hỗ trợ tạo phụ đề Karaoke chuẩn ASS / LRC, chỉnh sửa từng từ và xuất video Karaoke MP4 chất lượng cao.
-
----
-
-## ⚡ Hướng Dẫn Khởi Động Nhanh
-
-### 🔹 Bước 1: Cài đặt môi trường tự động (Chỉ cần chạy 1 lần đầu tiên)
-- Nhấp đúp vào file: **`1_CAI_DAT_MOI_TRUONG.bat`**
-- Tool sẽ tự động tạo môi trường ảo độc lập (`venv`), cấu hình card đồ họa NVIDIA (nếu có) và tải các thư viện AI cần thiết.
-- *Lưu ý:* Máy tính cần có sẵn **Python 3.10 hoặc 3.11** (khi cài Python nhớ tích chọn ô `[Add Python to PATH]`).
-
-### 🔹 Bước 2: Khởi động phòng thu
-- Nhấp đúp vào file: **`2_KHOI_DONG_TOOL.bat`**
-- Trình duyệt web sẽ tự động mở giao diện tại: **http://127.0.0.1:8008**
-- Bắt đầu tạo bài hát karaoke ngay lập tức!
+Phan mem chuyen nghiep tu dong tach nhac nen (Demucs v4) va nhan dien loi bai hat (Faster-Whisper) chay 100% Offline / Local tren may tinh ca nhan. Ho tro tao phu de Karaoke chuan ASS / LRC, keo tha dong chu truc tiep tren man hinh, chon hieu ung dem nhip KTV va xuat video Karaoke MP4 chat luong cao.
 
 ---
 
-## 🌟 Các Tính Năng Nổi Bật
+## Cau Truc Thu Muc Khoi Dong & Cai Dat
 
-1. **Nhập nguồn nhạc linh hoạt:**
-   - Hỗ trợ tải trực tiếp từ link YouTube / SoundCloud hoặc tải lên file MP3, WAV, FLAC, M4A, MP4 từ máy tính.
-2. **Tách nhạc nền AI chất lượng phòng thu (Demucs v4):**
-   - Tự động tách âm thanh thành giọng hát (Vocals) và nhạc beat (Instrumental) nguyên gốc.
-3. **Nhận diện lời & Canh nhịp tự động (Faster-Whisper):**
-   - Nhận diện lời tiếng Việt chính xác, căn thời gian từng từ chuẩn xác.
-4. **Phòng thu chỉnh sửa trực quan (Studio Editor):**
-   - Trình phát đa kênh (bật/tắt giọng ca sĩ, chỉnh âm lượng nhạc nền).
-   - Tinh chỉnh thời gian từng từ, sửa từ ngữ trực tiếp trên giao diện dạng sóng âm (Waveform).
-   - Tùy biến vị trí phụ đề: điều chỉnh thanh trượt độ cao Dòng trên (Line 1) và Dòng dưới (Line 2) tiện lợi.
-5. **Đa dạng phong cách hiển thị (Karaoke Styles):**
-   - Phong cách Neon Phát Sáng, Truyền Thống, Hiện Đại, Gradient Rực Rỡ.
-   - Hỗ trợ đổi hình nền video hoặc tải lên ảnh nền riêng theo sở thích.
-6. **Xuất file & Video Karaoke chuyên nghiệp:**
-   - Xuất video chuẩn MP4 chất lượng cao Full HD.
-   - Xuất file phụ đề Karaoke chuẩn ASS (tương thích Aegisub, Premiere, CapCut) hoặc LRC.
+De dam bao tuong thich va de su dung, cac tep cai dat va khoi dong duoc chia thanh 3 thu muc rieng biet:
+
+### 1. Thu muc `Windows/` (May tinh Windows 10, 11)
+- `1_Cai_Dat_Windows.bat`: Thiet lap moi truong ao venv, tu dong nhan dien card NVIDIA CUDA.
+- `2_Khoi_Dong_Windows.bat`: Khoi dong server va tu dong mo trinh duyet web `http://127.0.0.1:8008`.
+- `Huong_Dan_Windows.txt`: Tai lieu huong dan chi tiet cho Windows.
+
+### 2. Thu muc `Mac_Chip_M/` (Mac chip Apple Silicon M1, M2, M3, M4)
+- `1_Cai_Dat_Mac_M.command`: Cai dat moi truong, ho tro bo tang toc GPU Metal (MPS) va Apple VideoToolbox.
+- `2_Khoi_Dong_Mac_M.command`: Khoi dong phong thu tren macOS.
+- `Huong_Dan_Mac_M.txt`: Tai lieu huong dan chi tiet cho Mac chip M.
+
+### 3. Thu muc `MacOS_Intel/` (Mac dung CPU Intel Core)
+- `1_Cai_Dat_MacOS_Intel.command`: Cai dat moi truong cho he thong Intel.
+- `2_Khoi_Dong_MacOS_Intel.command`: Khoi dong phong thu.
+- `Huong_Dan_MacOS_Intel.txt`: Tai lieu huong dan cho Mac Intel.
 
 ---
 
-## 💡 Yêu Cầu Hệ Thống Khuyến Nghị
-- **Hệ điều hành:** Windows 10 / 11 64-bit.
-- **Phần cứng:**
-  - Chạy mượt mà trên CPU đa nhân.
-  - Tối ưu tốt nhất với card màn hình rời NVIDIA (GTX 1660, RTX 2060, RTX 3060 trở lên) để xử lý nhanh gấp 5-10 lần.
-- **Công cụ bổ trợ:** Đã cài đặt FFmpeg trên máy tính để xuất video MP4.
+## Cac Tinh Nang Chinh
+
+1. **Nhap nguon nhac da dang:**
+   - Ho tro dan link YouTube / SoundCloud hoac tai file MP3, WAV, FLAC, M4A tu may tinh.
+2. **Tach nhac nen chat luong cao (Demucs v4):**
+   - Tach giong hat (Vocals) va beat (Instrumental) rieng biet.
+3. **Nhan dien loi va can nhip chinh xac (Faster-Whisper):**
+   - Nhan dien loi tieng Viet, can thoi gian tung tu.
+4. **Phong thu tinh chinh truc quan (Studio Editor):**
+   - Keo tha truc tiep Dong 1 va Dong 2 ngay tren man hinh 16:9 de can chinh vi tri.
+   - Dem nhip chuyen nghiep: Trai Tim Do, Mat Cuoi Vang, Cham KTV, So Dem 4-3-2-1.
+   - Badge Tone giong ca: Tone Nam, Tone Nu, Tone Goc.
+5. **Xuat video va file phu de:**
+   - Xuat video MP4 chat luong Full HD 1080p.
+   - Xuat file phu de chuan ASS (tuong thich Aegisub, Premiere, CapCut) hoac LRC.
+
+---
+
+## Yeu Cau He Thong
+
+- **Windows:** Windows 10 / 11 64-bit, khuyen nghi Python 3.10 hoac 3.11. Ho tro card roi NVIDIA de tang toc CUDA.
+- **macOS:** macOS 12 trở lên. Ho tro toan dien Apple Silicon M1/M2/M3/M4 (MPS GPU) va Mac Intel.
+- **Cong cu bo tro:** FFmpeg de xuat video MP4.

@@ -1,10 +1,15 @@
 @echo off
 setlocal
-title AI Karaoke Studio Pro - 100%% Local AI Engine
+if exist "%~dp0\server.py" (
+    cd /d "%~dp0"
+) else (
+    cd /d "%~dp0\.."
+)
+title AI Karaoke Studio Pro - Windows Launcher
 color 0B
 
 echo =======================================================================
-echo          AI KARAOKE STUDIO PRO - 100%% LOCAL AI POWERED
+echo          AI KARAOKE STUDIO PRO - WINDOWS (100%% LOCAL AI)
 echo =======================================================================
 echo.
 
@@ -14,14 +19,14 @@ if not exist "venv\Scripts\python.exe" (
     echo =======================================================================
     echo.
     echo Truoc khi su dung lan dau, he thong can thiet lap moi truong AI
-    echo bang cach chay file: 1_CAI_DAT_MOI_TRUONG.bat
+    echo bang cach chay file: 1_Cai_Dat_Windows.bat
     echo.
     echo Nhan phim bat ky de BAT DAU CAI DAT MOI TRUONG ngay bay gio...
     echo (Hoac dong cua so nay neu ban muon chay sau)
     echo =======================================================================
     echo.
     pause
-    call 1_CAI_DAT_MOI_TRUONG.bat
+    call "%~dp0\1_Cai_Dat_Windows.bat"
     if not exist "venv\Scripts\python.exe" (
         echo.
         echo [THONG BAO] Moi truong venv chua duoc tao xong. Khong the khoi dong.
