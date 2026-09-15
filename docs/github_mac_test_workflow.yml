@@ -1,43 +1,30 @@
 name: Test AI Karaoke on Real Apple Silicon Mac
 
 on:
-  workflow_dispatch: # Cho phep bam nut chay test thu cong tren GitHub
+  workflow_dispatch:
   push:
-    branches: [ main, master ]
+    branches: [ main ]
 
 jobs:
-  test-mac-apple-silicon:
-    runs-on: macos-14 # May Mac chay chip Apple Silicon M-series that 100% tren GitHub
+  test-mac:
+    runs-on: macos-14
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Python 3.11
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      - name: Install FFmpeg via Homebrew
+      - name: Install FFmpeg
         run: brew install ffmpeg
-
-      - name: Validate Mac Launch Scripts
-        run: |
-          for f in Mac_Chip_M/*.command; do
-            echo "Checking: $f"
-            bash -n "$f"
-          done
-
-      - name: Test Environment Setup on Mac
-        run: |
-          python3 setup_env.py venv_mac
-
-      - name: Verify Core AI Libraries on Apple Silicon
+      - name: Validate Mac Scripts
+        run: for f in Mac_Chip_M/*.command; do bash -n "$f"; done
+      - name: Setup Environment
+        run: python3 setup_env.py venv_mac
+      - name: Verify AI on Apple Silicon
         run: |
           ./venv_mac/bin/python -c "
           import sys, torch
           print('Platform:', sys.platform)
-          print('PyTorch version:', torch.__version__)
-          print('Apple Silicon MPS available:', hasattr(torch.backends, 'mps') and torch.backends.mps.is_available())
+          print('MPS GPU Available:', hasattr(torch.backends, 'mps') and torch.backends.mps.is_available())
           import demucs, faster_whisper, fastapi
           print('ALL CORE AI LIBRARIES LOADED PERFECTLY ON APPLE SILICON!')
           "
