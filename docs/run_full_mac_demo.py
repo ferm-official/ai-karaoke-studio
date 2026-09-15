@@ -144,17 +144,43 @@ def main():
 
     # 8. Upload output_mac.zip to free direct transfer link
     print("\n[*] Dang tai file ket qua len server truc tiep...")
+    direct_link = ""
     try:
-        req = urllib.request.Request("https://0x0.st", data=open(zip_output, "rb").read())
-        req.add_header("User-Agent", "curl/8.0.0")
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            direct_link = resp.read().decode("utf-8").strip()
+        p_lb = subprocess.run([
+            "curl", "-s", "-F", "reqtype=fileupload", "-F", "time=72h",
+            f"-F", f"fileToUpload=@{zip_output}",
+            "https://litterbox.catbox.moe/resources/internals/api.php"
+        ], capture_output=True, text=True, timeout=60)
+        if p_lb.returncode == 0 and "http" in p_lb.stdout:
+            direct_link = p_lb.stdout.strip()
             print("=======================================================================")
             print(f"[LINK_DOWNLOAD_TRUC_TIEP]: {direct_link}")
             print("=======================================================================")
             (out_dir / "direct_download_link.txt").write_text(direct_link, encoding="utf-8")
+        else:
+            print(f"[NOTE] Litterbox response: {p_lb.stdout.strip()[:100]}")
     except Exception as e:
-        print(f"[NOTE] Khong the tai len 0x0.st ({e})")
+        print(f"[NOTE] Khong the tai len litterbox ({e})")
+
+    if not direct_link:
+        try:
+            print("[*] Thu tai len server du phong tmpfiles.org...")
+            p_tf = subprocess.run([
+                "curl", "-s", "-F", f"file=@{zip_output}",
+                "https://tmpfiles.org/api/v1/upload"
+            ], capture_output=True, text=True, timeout=60)
+            if p_tf.returncode == 0 and "data" in p_tf.stdout:
+                import json
+                d = json.loads(p_tf.stdout)
+                u = d.get("data", {}).get("url", "")
+                if u:
+                    direct_link = u.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/")
+                    print("=======================================================================")
+                    print(f"[LINK_DOWNLOAD_TRUC_TIEP]: {direct_link}")
+                    print("=======================================================================")
+                    (out_dir / "direct_download_link.txt").write_text(direct_link, encoding="utf-8")
+        except Exception as e:
+            print(f"[NOTE] Khong the tai len tmpfiles ({e})")
 
     # 9. Try pushing to branch mac-output-demo on GitHub
     try:

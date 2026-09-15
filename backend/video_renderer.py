@@ -107,11 +107,11 @@ def render_karaoke_video(
     if is_video_bg:
         # Loop video background to match audio duration
         input_args = ["-stream_loop", "-1", "-i", str(bg_file), "-i", str(audio_file)]
-        vf = f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},ass='{escaped_ass}'"
+        vf = f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},ass=filename='{escaped_ass}'"
     else:
         # Loop static image with subtle zoom/ambient motion
         input_args = ["-loop", "1", "-i", str(bg_file), "-i", str(audio_file)]
-        vf = f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},ass='{escaped_ass}'"
+        vf = f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},ass=filename='{escaped_ass}'"
 
     # Select best hardware accelerated encoder
     is_macos = (sys.platform == "darwin")
