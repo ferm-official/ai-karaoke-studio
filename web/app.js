@@ -197,6 +197,16 @@ function initApp() {
     setupLibraryHandlers();
     loadProjectsList();
     initVisualizer();
+
+    // Auto-load project and tab from URL query params
+    const urlParams = new URLSearchParams(window.location.search);
+    const projId = urlParams.get("project");
+    const targetTab = urlParams.get("tab");
+    if (projId) {
+        loadExistingProject(projId, targetTab || "playerTab");
+    } else if (targetTab) {
+        switchTab(targetTab);
+    }
 }
 
 if (document.readyState === "loading") {

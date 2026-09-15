@@ -75,13 +75,13 @@ export function renderProjectsGrid(projects) {
     }).join("");
 }
 
-export async function loadExistingProject(projectId) {
+export async function loadExistingProject(projectId, targetTab = "playerTab") {
     try {
         const res = await fetch(`/api/status/${projectId}`);
         const data = await res.json();
         if (data.status === "ready" && data.data) {
             loadProjectData(data.data);
-            switchTab("playerTab");
+            switchTab(targetTab || "playerTab");
         } else {
             alert("Bài hát này chưa sẵn sàng hoặc bị lỗi.");
         }
